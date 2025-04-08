@@ -3,7 +3,12 @@
 
 #include "utils.h"
 
-void* init_apidoc(char* apidoc_path);
+typedef cJSON *Apidoc;
+typedef cJSON *FunctionApi;
 
+
+Apidoc init_apidoc(char* apidoc_path);
+
+FunctionApi get_function_api(Apidoc apidoc, char* function_name);
 
 #endif // GEMU_APIDOC_H

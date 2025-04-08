@@ -173,8 +173,7 @@ cJSON *read_parameters64(Gemu *gemu_instance, CPUState *cpu, const char *func_na
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
     const cJSON *function_entry = NULL;
-    function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
+    function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
     if (!cJSON_IsObject(function_entry)) {
         return output;
     }
@@ -246,8 +245,7 @@ cJSON *read_parameters32(Gemu *gemu_instance, CPUState *cpu, const char *func_na
     cJSON_AddStringToObject(output, "dll_name", dll_name);
     out_parameter_list->number_of_outparameters = 0;
     const cJSON *function_entry = NULL;
-    function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
+    function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
     if (!cJSON_IsObject(function_entry)) {
         return output;
     }
@@ -321,8 +319,7 @@ cJSON *read_out_parameters32(Gemu *gemu, CPUState *cpu, const char *func_name,
         return output;
     }
 
-    cJSON *function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
+    cJSON *function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
     if (!cJSON_IsObject(function_entry)) {
         return output;
     }
@@ -392,8 +389,7 @@ cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
         return output;
     }
 
-    cJSON *function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
+    cJSON *function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
     if (!cJSON_IsObject(function_entry)) {
         return output;
     }
