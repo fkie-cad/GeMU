@@ -13,27 +13,23 @@ Apidoc init_apidoc(char* apidoc_path){
                             g_str_equal, /* Comparator     */
                             g_free,
                             g_free);  /* Val destructor */
-    cJSON_ArrayForEach(json_apidoc_entry, json_apidoc){
+    while ((json_apidoc_entry =  cJSON_GetArrayItem(json_apidoc, 0)) != NULL){
         current_key = json_apidoc_entry->string;
-        printf("apidoc: %s\n", current_key);
-        if (current_key != NULL)
-        {
-            g_hash_table_insert(
-                hash_table,
-                (gpointer)g_strdup(current_key),
-                // cJSON_DetachItemViaPointer(json_apidoc, json_apidoc_entry)
-                json_apidoc_entry
-            );
-        }
+        g_hash_table_insert(
+            hash_table,
+            (gpointer)g_strdup(current_key),
+            json_apidoc_entry
+        );
+        cJSON_DetachItemFromArray(json_apidoc, 0);
     }
 
-    // cJSON_Delete(json_apidoc);
+    cJSON_Delete(json_apidoc);
     return hash_table;
 }
 
 //maybe force inline?
 FunctionApi get_function_api(Apidoc apidoc, char* function_name){
-    FunctionApi result =  g_hash_table_lookup(apidoc, (gpointer)function_name);
+    FunctionApi result = g_hash_table_lookup(apidoc, (gpointer)function_name);
     return result;
     // return cJSON_GetObjectItemCaseSensitive(apidoc, function_name);
 }
