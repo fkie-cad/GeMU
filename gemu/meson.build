@@ -9,6 +9,7 @@ gemu_ss.add(files(
   './mappedwaitinglist.c',
   './hooks.c',
   './gemu.c',
+  './apidoc.c',
   './win_spector.c',
   './dotnet_spector.c'
   ))

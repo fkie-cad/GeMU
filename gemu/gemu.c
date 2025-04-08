@@ -5,6 +5,7 @@
 #include "gemu/memorymapper.h"
 #include "gemu/mappedwaitinglist.h"
 #include "glib.h"
+#include "gemu/apidoc.h"
 #include "gemu/hooks.h"
 #include "gemu/win_spector.h"
 #include "gemu/dotnet_spector.h"
@@ -1428,7 +1429,7 @@ void gemu_init(void) {
     Gemu instance = {
             .hooker = init_hooker(100000),
             .win_spec = init_windows_introspecter(200, WATCHED_PROGRAMS),
-            .parameter_lookup = parse_file(apidoc),
+            .parameter_lookup = init_apidoc(apidoc),
             .syscall_lookup = parse_file(syscalltable),
             .syscall_lookup_for_build = NULL,
             .syscall_lookup_for_build_enum = NULL,
