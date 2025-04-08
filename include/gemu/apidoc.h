@@ -1,9 +1,10 @@
 #ifndef GEMU_APIDOC_H
 #define GEMU_APIDOC_H
 
+#include "glib.h"
 #include "utils.h"
 
-typedef cJSON *Apidoc;
+typedef GHashTable *Apidoc;
 typedef cJSON *FunctionApi;
 
 
