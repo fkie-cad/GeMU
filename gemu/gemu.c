@@ -172,13 +172,12 @@ cJSON *read_parameters64(Gemu *gemu_instance, CPUState *cpu, const char *func_na
     cJSON *output = cJSON_CreateObject();
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
-    const cJSON *function_entry = NULL;
-    function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
+    cJSON *parameters_array = function_entry->parameters;
     cJSON *parameter;
     int outparameter = 0;
     for (int i = 0; i < cJSON_GetArraySize(parameters_array); i++) {
@@ -244,13 +243,12 @@ cJSON *read_parameters32(Gemu *gemu_instance, CPUState *cpu, const char *func_na
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
     out_parameter_list->number_of_outparameters = 0;
-    const cJSON *function_entry = NULL;
-    function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
+    cJSON *parameters_array = function_entry->parameters;
     cJSON *parameter;
     int outparameter = 0;
     for (int i = 0; i < cJSON_GetArraySize(parameters_array); i++) {
@@ -319,13 +317,11 @@ cJSON *read_out_parameters32(Gemu *gemu, CPUState *cpu, const char *func_name,
         return output;
     }
 
-    cJSON *function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
+    cJSON *parameters_array = function_entry->parameters;
     cJSON *parameter;
     for (int i = 0; i < number_of_outparameters; i++) {
         parameter = cJSON_GetArrayItem(parameters_array,
@@ -389,13 +385,11 @@ cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
         return output;
     }
 
-    cJSON *function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
+    cJSON *parameters_array = function_entry->parameters;
     cJSON *parameter;
     for (int i = 0; i < number_of_outparameters; i++) {
         parameter = cJSON_GetArrayItem(parameters_array,
