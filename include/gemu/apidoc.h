@@ -6,8 +6,6 @@
 
 typedef GHashTable Apidoc;
 
-#define MAX_PARAMETERS 10
-
 typedef enum {
   PARAMETER_IN  = 0x0001,
   PARAMETER_OUT = 0x0010,
@@ -21,7 +19,7 @@ typedef struct{
 } FunctionParameter;
 
 typedef struct {
-  FunctionParameter parameters[MAX_PARAMETERS];
+  FunctionParameter *parameters;
   int num_parameters;
   cJSON *return_type;
 } FunctionApi;

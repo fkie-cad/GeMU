@@ -16,9 +16,9 @@ static void convert_parameter_list(cJSON* parameter_list_json, FunctionApi* func
     FunctionParameter* current_param;
     cJSON* tmp;
     int i = 0;
+    function_api->parameters = malloc(cJSON_GetArraySize(parameter_list_json)*sizeof(FunctionParameter));
+    current_param = function_api->parameters;
     cJSON_ArrayForEach(current_json_param, parameter_list_json){
-        current_param = &function_api->parameters[i];
-
         // in or out
         tmp = current_json_param->child;
         current_param->attributes = convert_parameter_attributes(tmp->valuestring);
@@ -32,9 +32,7 @@ static void convert_parameter_list(cJSON* parameter_list_json, FunctionApi* func
         current_param->name = tmp->valuestring;
         
         i++;
-        if (i == MAX_PARAMETERS){
-            break;
-        }
+        current_param++;
     }
     function_api->num_parameters = i;
     // we are lazy here so we dont copy strings and dont delete the original cJSON
