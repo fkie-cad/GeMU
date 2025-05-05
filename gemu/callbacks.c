@@ -303,8 +303,7 @@ void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb)
     //QWORD processid;
     //QWORD threadid;
     //get_current_pid_and_tid(cpu, &processid, &threadid);
-    //printf("%llu:%llu:B:0x%lx,%i\n", thread->Process.ID, thread->ThreadId, cpu->env_ptr->eip, tb->size);
-    //thread->ThreadId = threadid;
+    //printf("%llu:%llu:B:0x%lx,%i\n", thread->Process.ID, threadid, cpu->env_ptr->eip, tb->size);
     //printf("%llu:B:0x%lx,%i\n", thread->Process.ID, cpu->env_ptr->eip, tb->size);
 
     check_for_unpacking(cpu, tb, thread, gemu_instance);

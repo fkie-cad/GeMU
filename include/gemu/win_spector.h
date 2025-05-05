@@ -93,7 +93,6 @@ typedef struct
 } syscall_hook_t;
 typedef struct
 {
-    unsigned long long int ThreadId;
     WinProcess Process;
     bool is_excluded;
     void* process_handles;

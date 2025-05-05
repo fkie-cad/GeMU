@@ -115,12 +115,14 @@ WinThread *wi_current_thread(WindowsIntrospecter *w, CPUState *cpu,
                              bool add_thread) {
   target_ulong asid = cpu->env_ptr->cr[3];
   // WinProcess is cached
-  WinThread cmpThread = {0,
-                         {
-                             .ID = 0,
-                             .ASID = asid,
-                         },
-                         false};
+  WinThread cmpThread = {
+      .Process = {
+          .ID = 0,
+          .ASID = asid,
+      },
+      .is_excluded = false
+  };
+
   WinThread *thread =
       (WinThread *)qht_lookup(w->asid_winthread_map, &cmpThread, asid);
 
@@ -227,7 +229,6 @@ WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu,
 
   WinThread *newThreadPtr = malloc(sizeof(WinThread));
   WinThread newThread = {
-      .ThreadId = teb.ClientId.ThreadId,
       .process_handles = g_hash_table_new(NULL, NULL),
       .section_handles = g_hash_table_new(NULL, NULL),
       .Process =
