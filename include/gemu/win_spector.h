@@ -68,7 +68,6 @@ typedef struct
     PEB64 PEB;
     RTL_USER_PROCESS_PARAMETERS64 ProcessParameters;
     struct Module_List *module_list;
-    GHashTable *stack_depth;
 } WinProcess;
 
 typedef enum {BITNESS_UNKNOWN = 0, BITNESS_32 = 1, BITNESS_64 = 2} Bitness;
@@ -135,15 +134,10 @@ void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid);
 
 void get_pid_and_tid_from_teb_address(target_ulong teb_address, CPUState *cpu, QWORD *processid, QWORD *threadid);
 
-char* get_stack_depth_indicator(WinThread *thread);
-
 void print_memory_map(CPUState *cpu, WinThread *thread);
 
 bool is_thread_excluded(WindowsIntrospecter *w, WinThread *t);
 
 struct qht *init_asid_winthread_map(int bucket_size);
-
-void free_value(gpointer data);
-
 
 #endif //GEMU_WIN_SPECTOR_HPP

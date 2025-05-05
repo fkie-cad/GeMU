@@ -21,8 +21,6 @@ static bool winthread_cmp(const void *a, const void *b) {
   return wa->Process.ASID == wb->Process.ASID;
 }
 
-void free_value(gpointer data) { free(data); }
-
 struct qht *init_asid_winthread_map(int bucket_size) {
   struct qht *ht = malloc(sizeof(struct qht));
   if (!ht) {
@@ -239,7 +237,6 @@ WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu,
               .PEB = peb,
               .ImagePathName = imagePathName,
               .ProcessParameters = processParameters,
-              .stack_depth = g_hash_table_new(g_int64_hash, g_int64_equal),
           },
       .is_excluded = false,
       .new_sections = new_sections,
@@ -254,30 +251,4 @@ WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu,
   newThreadPtr->new_sections = list;
 
   return newThreadPtr;
-}
-
-char *get_stack_depth_indicator(WinThread *thread) {
-  if (!g_hash_table_contains(thread->Process.stack_depth, &thread->ThreadId)) {
-    g_hash_table_insert(thread->Process.stack_depth, &thread->ThreadId, 0);
-  }
-  int repeatCount = GPOINTER_TO_INT(
-      g_hash_table_lookup(thread->Process.stack_depth, &thread->ThreadId));
-  const char *constantString = "    ";
-  size_t constantStringLength = strlen(constantString);
-  size_t resultLength =
-      constantStringLength * repeatCount + 1; // +1 for the null terminator
-  char *result = (char *)malloc(resultLength * sizeof(char));
-  if (result == NULL) {
-    printf("Memory allocation failed.\n");
-    return NULL;
-  }
-
-  for (int i = 0; i < repeatCount; i++) {
-    memcpy(result + (i * constantStringLength), constantString,
-           constantStringLength);
-  }
-
-  result[resultLength - 1] = '\0';
-
-  return result;
 }

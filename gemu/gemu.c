@@ -668,14 +668,6 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
 
     //load library is always interesting, for DOTNET and WINAPI case
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
-        gpointer stack_depth = g_hash_table_lookup(thread->Process.stack_depth, &thread->ThreadId);
-        if (stack_depth == NULL) {
-            stack_depth = 0;
-        }
-        else {
-            stack_depth -= 1;
-        }
-        g_hash_table_insert(thread->Process.stack_depth, &thread->ThreadId, stack_depth);
         wi_extract_module_list(cpu, thread);
         handle_loaded_library(thread->current_modules);
         // print_module_nodes(thread->current_modules);
@@ -1039,12 +1031,6 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, thread, &newHook.out_parameter_list, is32bit);
-        gpointer stack_depth = g_hash_table_lookup(thread->Process.stack_depth, &thread->ThreadId);
-        if (stack_depth == NULL) {
-            stack_depth = 0;
-        }
-        stack_depth += 1;
-        g_hash_table_insert(thread->Process.stack_depth, &thread->ThreadId, stack_depth);
     }
 
     if (hkr_add_new_hook(gemu_instance->hooker, newHook) && newHook.addr != 0) {

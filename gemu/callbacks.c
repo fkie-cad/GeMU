@@ -215,6 +215,7 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb)
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, thread, CB_BEFORE_TB_EXEC);
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, thread, EXIT_FROM_API);
 
+    // printf("%llu:E,0x%lx,%i\n", thread->Process.ID, cpu->env_ptr->eip, tb->size);
     return;
 }
 
