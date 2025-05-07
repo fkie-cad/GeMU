@@ -14,28 +14,28 @@
 
 struct timespec *start_time = NULL;
 
-static bool winthread_cmp(const void *a, const void *b) {
-  WinThread *wa = (WinThread *)a;
-  WinThread *wb = (WinThread *)b;
+static bool WinProcess_cmp(const void *a, const void *b) {
+  WinProcess *wa = (WinProcess *)a;
+  WinProcess *wb = (WinProcess *)b;
 
   return wa->Process.ASID == wb->Process.ASID;
 }
 
-struct qht *init_asid_winthread_map(int bucket_size) {
+struct qht *init_asid_WinProcess_map(int bucket_size) {
   struct qht *ht = malloc(sizeof(struct qht));
   if (!ht) {
     perror("Failed to allocate QHT");
     return NULL;
   }
-  qht_init(ht, winthread_cmp, bucket_size, 0);
+  qht_init(ht, WinProcess_cmp, bucket_size, 0);
   return ht;
 }
 
 WindowsIntrospecter *init_windows_introspecter(int bucket_size,
                                                const char *watched_programs) {
   WindowsIntrospecter *w = malloc(sizeof(WindowsIntrospecter));
-  w->asid_winthread_map = init_asid_winthread_map(bucket_size);
-  w->pid_winthread_map = g_hash_table_new(NULL, NULL);
+  w->asid_winprocess_map = init_asid_WinProcess_map(bucket_size);
+  w->pid_winprocess_map = g_hash_table_new(NULL, NULL);
   w->watched_programs = strdup(watched_programs);
   printf("Initialized WindowsIntrospecter, watching processes of: %s\n",
          w->watched_programs);
@@ -44,31 +44,31 @@ WindowsIntrospecter *init_windows_introspecter(int bucket_size,
 
 void wi_destroy(WindowsIntrospecter *w) {
   printf("Destroying WindowsIntrospecter...\n");
-  qht_destroy(w->asid_winthread_map);
-  free(w->asid_winthread_map);
+  qht_destroy(w->asid_winprocess_map);
+  free(w->asid_winprocess_map);
   free(w);
   printf("Done destroying WindowsIntrospecter\n");
 }
 
-void wi_add_thread(WindowsIntrospecter *w, target_ulong asid,
-                   WinThread *winthread) {
-    if (winthread->Process.ImagePathName[0] == '\0' || winthread->Process.ID == 0) {
+void wi_add_process(WindowsIntrospecter *w, target_ulong asid,
+                   WinProcess *process) {
+    if (process->Process.ImagePathName[0] == '\0' || process->Process.ID == 0) {
         return;
     }
-  printf("ADDING TO THE LOOKUPS, %llu, %lu, %lu, %s\n", winthread->Process.ID,
-         winthread->Process.ASID, asid, winthread->Process.ImagePathName);
-  if (w->asid_winthread_map == NULL) {
-    perror("ASID-WinThread map not initialized");
+  printf("ADDING TO THE LOOKUPS, %llu, %lu, %lu, %s\n", process->Process.ID,
+         process->Process.ASID, asid, process->Process.ImagePathName);
+  if (w->asid_winprocess_map == NULL) {
+    perror("ASID-WinProcess map not initialized");
     return;
   }
-  if (!qht_insert(w->asid_winthread_map, winthread, asid, NULL)) {
-    perror("Failed to insert WinThread into ASID-WinThread map");
+  if (!qht_insert(w->asid_winprocess_map, process, asid, NULL)) {
+    perror("Failed to insert WinProcess into ASID-WinProcess map");
   }
-  g_hash_table_insert(w->pid_winthread_map,
-                      GINT_TO_POINTER(winthread->Process.ID), winthread);
+  g_hash_table_insert(w->pid_winprocess_map,
+                      GINT_TO_POINTER(process->Process.ID), process);
 }
 
-bool is_thread_excluded(WindowsIntrospecter *w, WinThread *t) {
+bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p) {
   if (w->watched_programs == NULL || strlen(w->watched_programs) == 0) {
     perror("Watched programs not initialized");
     return false;
@@ -88,13 +88,13 @@ bool is_thread_excluded(WindowsIntrospecter *w, WinThread *t) {
 
   char *watched_process = strtok(watched_processes_copy, ",");
   while (watched_process != NULL) {
-    if (strcasestr(t->Process.ImagePathName, watched_process) != NULL) {
+    if (strcasestr(p->Process.ImagePathName, watched_process) != NULL) {
       free(watched_processes_copy);
       Gemu *gemu = gemu_get_instance();
-      g_hash_table_insert(gemu->pids_to_lookout_for, (gpointer)t->Process.ID,
+      g_hash_table_insert(gemu->pids_to_lookout_for, (gpointer)p->Process.ID,
                           NULL);
-      g_print("Including ASID %lu program=%s\n", t->Process.ASID,
-              t->Process.ImagePathName);
+      g_print("Including ASID %lu program=%s\n", p->Process.ASID,
+              p->Process.ImagePathName);
       if (start_time == NULL) {
         start_time = malloc(sizeof(struct timespec));
         clock_gettime(CLOCK_MONOTONIC_RAW, start_time);
@@ -107,15 +107,15 @@ bool is_thread_excluded(WindowsIntrospecter *w, WinThread *t) {
   return true;
 }
 
-WinThread *get_winthread_for_pid(WindowsIntrospecter *w, target_ulong id) {
-  return g_hash_table_lookup(w->pid_winthread_map, (gconstpointer)id);
+WinProcess *get_WinProcess_for_pid(WindowsIntrospecter *w, target_ulong id) {
+  return g_hash_table_lookup(w->pid_winprocess_map, (gconstpointer)id);
 }
 
-WinThread *wi_current_thread(WindowsIntrospecter *w, CPUState *cpu,
-                             bool add_thread) {
+WinProcess *wi_current_process(WindowsIntrospecter *w, CPUState *cpu,
+                             bool add_process) {
   target_ulong asid = cpu->env_ptr->cr[3];
-  // WinProcess is cached
-  WinThread cmpThread = {
+  // WinProcessInner is cached
+  WinProcess cmpThread = {
       .Process = {
           .ID = 0,
           .ASID = asid,
@@ -123,52 +123,52 @@ WinThread *wi_current_thread(WindowsIntrospecter *w, CPUState *cpu,
       .is_excluded = false
   };
 
-  WinThread *thread =
-      (WinThread *)qht_lookup(w->asid_winthread_map, &cmpThread, asid);
+  WinProcess *process =
+      (WinProcess *)qht_lookup(w->asid_winprocess_map, &cmpThread, asid);
 
-  if (!thread) {
-    // WinProcess is not cached, add it to cache
-    thread = wi_extract_thread_from_memory(w, cpu, asid);
-    if (add_thread) {
-      wi_add_thread(w, asid, thread);
+  if (!process) {
+    // WinProcessInner is not cached, add it to cache
+    process = wi_extract_process_from_memory(w, cpu, asid);
+    if (add_process) {
+      wi_add_process(w, asid, process);
     }
   }
 
   Gemu *gemu = gemu_get_instance();
 
-  if (thread == NULL || !g_hash_table_contains(gemu->pids_to_lookout_for, GINT_TO_POINTER(thread->Process.ID))) {
+  if (process == NULL || !g_hash_table_contains(gemu->pids_to_lookout_for, GINT_TO_POINTER(process->Process.ID))) {
     return NULL;
   }
 
   if (gemu->tracking_mode & TRACKING_BASICBLOCK){ // This if clause contains code to identify kernel for api hooking
-    if (thread->bitness == BITNESS_UNKNOWN && thread->Process.ImagePathName[0] != '\0'){
-      wi_extract_module_list(cpu, thread);
-      ModuleNode* current = thread->current_modules;
+    if (process->bitness == BITNESS_UNKNOWN && process->Process.ImagePathName[0] != '\0'){
+      wi_extract_module_list(cpu, process);
+      ModuleNode* current = process->current_modules;
       while (current != NULL) {
         if (strcmp(current->file,"c:\\windows\\system32\\wow64.dll") == 0){
-          thread->bitness = BITNESS_32;
+          process->bitness = BITNESS_32;
           break;
         }
         if (strcmp(current->file,"c:\\windows\\system32\\kernel32.dll") == 0){
-          thread->bitness = BITNESS_64;
+          process->bitness = BITNESS_64;
           break;
         }
         current = current->next;
       }
     }
 
-    if (thread->bitness == BITNESS_32 && !gemu->kernel32_32bit_found){
-      try_extract_kernel32_address(gemu, cpu, thread);
+    if (process->bitness == BITNESS_32 && !gemu->kernel32_32bit_found){
+      try_extract_kernel32_address(gemu, cpu, process);
     }
-    if (thread->bitness == BITNESS_64 && !gemu->kernel32_64bit_found){
-      try_extract_kernel32_address(gemu, cpu, thread);
+    if (process->bitness == BITNESS_64 && !gemu->kernel32_64bit_found){
+      try_extract_kernel32_address(gemu, cpu, process);
     }
   }
 
-  return thread;
+  return process;
 }
 
-void print_memory_map(CPUState *cpu, WinThread *thread) {
+void print_memory_map(CPUState *cpu, WinProcess *process) {
   struct DoubleLinkedList *latest_sections =
       (struct DoubleLinkedList *)malloc(sizeof(struct DoubleLinkedList));
   latest_sections->head = NULL;
@@ -176,14 +176,16 @@ void print_memory_map(CPUState *cpu, WinThread *thread) {
   if (latest_sections->head == NULL)
     return;
 
+  // struct DoubleLinkedList new_sections;
+  // new_sections.head = NULL;
 
-  copy_written_to_flags(latest_sections, thread->new_sections);
-  // If thread->new-sections is freed, cache_section  and cache_section_written point to garbage!
+  copy_written_to_flags(latest_sections, process->new_sections);
+  // If process->new-sections is freed, cache_section  and cache_section_written point to garbage!
   // ...so we set it to NULL instead
-  thread->cache_section = NULL;
-  thread->cache_section_written = NULL;
-  freeList(thread->new_sections);
-  thread->new_sections = latest_sections;
+  process->cache_section = NULL;
+  process->cache_section_written = NULL;
+  freeList(process->new_sections);
+  process->new_sections = latest_sections;
 }
 
 void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid) {
@@ -195,7 +197,7 @@ void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid) {
   *threadid = teb.ClientId.ThreadId;
 }
 
-WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu,
+WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu,
                                          target_ulong asid) {
   TEB64 teb;
   PEB64 peb;
@@ -227,8 +229,8 @@ WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu,
       (struct DoubleLinkedList *)malloc(sizeof(struct DoubleLinkedList));
   new_sections->head = NULL;
 
-  WinThread *newThreadPtr = malloc(sizeof(WinThread));
-  WinThread newThread = {
+  WinProcess *newThreadPtr = malloc(sizeof(WinProcess));
+  WinProcess newThread = {
       .process_handles = g_hash_table_new(NULL, NULL),
       .section_handles = g_hash_table_new(NULL, NULL),
       .Process =
@@ -247,7 +249,7 @@ WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu,
       .bitness = BITNESS_UNKNOWN,
       .syscall_return_hook.active = false
   };
-  newThread.is_excluded = is_thread_excluded(w, &newThread);
+  newThread.is_excluded = is_process_excluded(w, &newThread);
   *newThreadPtr = newThread;
   newThreadPtr->new_sections = list;
 

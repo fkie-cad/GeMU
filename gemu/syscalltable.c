@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-static const cJSON *get_syscalls_for_build(Gemu *gemu_instance, const WinProcess* process) {
+static const cJSON *get_syscalls_for_build(Gemu *gemu_instance, const WinProcessInner* process) {
     // TODO(OPTIMIZE): This build number lookup and string conversion needs to be done only once
     //                 since it cannot change between processes on the same guest.
     const int build_number = process->PEB.OSBuildNumber;
@@ -18,7 +18,7 @@ static const cJSON *get_syscalls_for_build(Gemu *gemu_instance, const WinProcess
     return syscalls_for_build;
 }
 
-const char *lookup_syscall(Gemu *gemu_instance, const WinProcess* process, const int syscall_number) {
+const char *lookup_syscall(Gemu *gemu_instance, const WinProcessInner* process, const int syscall_number) {
     const cJSON *syscalls_for_build = gemu_instance->syscall_lookup_for_build;
     if(!syscalls_for_build){
         syscalls_for_build = get_syscalls_for_build(gemu_instance, process);
@@ -44,7 +44,7 @@ const char *lookup_syscall(Gemu *gemu_instance, const WinProcess* process, const
 
 
 
-static GHashTable *get_syscalls_for_build_enum(Gemu *gemu_instance, const WinProcess* process) {
+static GHashTable *get_syscalls_for_build_enum(Gemu *gemu_instance, const WinProcessInner* process) {
     const cJSON *syscalls_for_build = get_syscalls_for_build(gemu_instance, process);
     // TODO: Free
     GHashTable* syscalls_for_build_enum = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -65,10 +65,10 @@ static GHashTable *get_syscalls_for_build_enum(Gemu *gemu_instance, const WinPro
 } 
 
 
-syscall_t lookup_syscall_enum(Gemu *gemu_instance, const int syscall_number, WinProcess* (*get_process) (void)) {
+syscall_t lookup_syscall_enum(Gemu *gemu_instance, const int syscall_number, WinProcessInner* (*get_process) (void)) {
     const GHashTable *syscalls_for_build_enum = gemu_instance->syscall_lookup_for_build_enum;
     if(!syscalls_for_build_enum){
-        WinProcess * process = get_process();
+        WinProcessInner * process = get_process();
         if(!process){
             return UNKNOWN_SYSCALL;
         }
