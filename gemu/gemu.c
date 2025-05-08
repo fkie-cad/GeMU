@@ -519,7 +519,7 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
     printf("insert %i and %i to handle dict of process %lli\n",
            cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint,
            cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint,
-           process->Process.ID);
+           process->ID);
     if (cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint > 0 &&
         cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint > 0) {
         g_hash_table_insert(
@@ -538,7 +538,7 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
     int handle = cJSON_GetObjectItemCaseSensitive(output, "hProcess")->valueint;
     hwaddr remoteAddress = cJSON_GetObjectItemCaseSensitive(output, "remoteAddress")->valueint;
     size_t ViewSize = cJSON_GetObjectItemCaseSensitive(output, "ViewSize")->valueint;
-    target_ulong pid = process->Process.ID;
+    target_ulong pid = process->ID;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         pid = (target_ulong) g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle));
         printf("ZwMapViewOfSection injection into PID %li\n", pid);
@@ -550,8 +550,8 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
         }
         else {
             printf("I found the range in the other process :)\n");
-            addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, pid, remoteAddress, ViewSize, process->Process.ID, rangeptr->start, rangeptr->size);
-            addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, process->Process.ID, rangeptr->start, rangeptr->size, pid, remoteAddress, ViewSize);
+            addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, pid, remoteAddress, ViewSize, process->ID, rangeptr->start, rangeptr->size);
+            addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, process->ID, rangeptr->start, rangeptr->size, pid, remoteAddress, ViewSize);
             printf("i added the nodes to both lists\n");
         }
         return;
@@ -621,7 +621,7 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     }
-    printf("%llu:%llu:$-%s -> %li\n", process->Process.ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
+    printf("%llu:%llu:$-%s -> %li\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
 
     switch (hook->syscall_enum)
     {
@@ -661,7 +661,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     }
-    printf("%llu:%llu:$-%s -> %li\n", process->Process.ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
+    printf("%llu:%llu:$-%s -> %li\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
 
     //load library is always interesting, for DOTNET and WINAPI case
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
@@ -704,10 +704,10 @@ void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
     }
     if (cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint ==
         0) {
-        printf("Removing PID %lli\n", process->Process.ID);
+        printf("Removing PID %lli\n", process->ID);
         //dump_all_binaries(cpu, process);
         g_hash_table_remove(gemu_instance->pids_to_lookout_for,
-                            (gpointer) process->Process.ID);
+                            (gpointer) process->ID);
         if (g_hash_table_size(gemu_instance->pids_to_lookout_for) == 0) {
             printf("No more PIDs to monitor. Exiting...\n");
             gemu_destroy();
@@ -732,7 +732,7 @@ void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process, 
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
     int timestamp = (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000;
-    sprintf(filename, "dumps/%llu_%u_zwwritevirtualmemory_0x%llx_%u_dump_nr_%d", process->Process.ID, pid, addr, timestamp, file_counter);
+    sprintf(filename, "dumps/%llu_%u_zwwritevirtualmemory_0x%llx_%u_dump_nr_%d", process->ID, pid, addr, timestamp, file_counter);
     file_counter += 1;
     mkdir("dumps", 0777);
     FILE *file = fopen(filename, "wb");
@@ -763,7 +763,7 @@ void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
 
     }
     else if (handle > 10000) {
-        dump_WriteVirtualMemory(output, cpu, process, process->Process.ID);
+        dump_WriteVirtualMemory(output, cpu, process, process->ID);
     }
 }
 
@@ -793,7 +793,7 @@ void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
     QWORD filehandle = cJSON_GetObjectItemCaseSensitive(output, "FileHandle")->valueint;
-    sprintf(filename, "dumps/%llu_%llu_writtenfile_%lu_nr_%d", process->Process.ID, filehandle,
+    sprintf(filename, "dumps/%llu_%llu_writtenfile_%lu_nr_%d", process->ID, filehandle,
             (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, file_counter);
     file_counter += 1;
     mkdir("dumps", 0777);
@@ -976,7 +976,7 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook_ptr->out_parameter_list, process);
     }
 
-    printf("%llu:%llu:$+%s\n", process->Process.ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
+    printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
     cJSON_Delete(output);
 }
 
@@ -1027,7 +1027,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook.out_parameter_list, process);
     }
 
-    printf("%llu:%llu:$+%s\n", process->Process.ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
+    printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);

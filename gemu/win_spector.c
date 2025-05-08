@@ -18,7 +18,7 @@ static bool WinProcess_cmp(const void *a, const void *b) {
   WinProcess *wa = (WinProcess *)a;
   WinProcess *wb = (WinProcess *)b;
 
-  return wa->Process.ASID == wb->Process.ASID;
+  return wa->ASID == wb->ASID;
 }
 
 struct qht *init_asid_WinProcess_map(int bucket_size) {
@@ -52,11 +52,11 @@ void wi_destroy(WindowsIntrospecter *w) {
 
 void wi_add_process(WindowsIntrospecter *w, target_ulong asid,
                    WinProcess *process) {
-    if (process->Process.ImagePathName[0] == '\0' || process->Process.ID == 0) {
+    if (process->ImagePathName[0] == '\0' || process->ID == 0) {
         return;
     }
-  printf("ADDING TO THE LOOKUPS, %llu, %lu, %lu, %s\n", process->Process.ID,
-         process->Process.ASID, asid, process->Process.ImagePathName);
+  printf("ADDING TO THE LOOKUPS, %llu, %lu, %lu, %s\n", process->ID,
+         process->ASID, asid, process->ImagePathName);
   if (w->asid_winprocess_map == NULL) {
     perror("ASID-WinProcess map not initialized");
     return;
@@ -65,7 +65,7 @@ void wi_add_process(WindowsIntrospecter *w, target_ulong asid,
     perror("Failed to insert WinProcess into ASID-WinProcess map");
   }
   g_hash_table_insert(w->pid_winprocess_map,
-                      GINT_TO_POINTER(process->Process.ID), process);
+                      GINT_TO_POINTER(process->ID), process);
 }
 
 bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p) {
@@ -88,13 +88,13 @@ bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p) {
 
   char *watched_process = strtok(watched_processes_copy, ",");
   while (watched_process != NULL) {
-    if (strcasestr(p->Process.ImagePathName, watched_process) != NULL) {
+    if (strcasestr(p->ImagePathName, watched_process) != NULL) {
       free(watched_processes_copy);
       Gemu *gemu = gemu_get_instance();
-      g_hash_table_insert(gemu->pids_to_lookout_for, (gpointer)p->Process.ID,
+      g_hash_table_insert(gemu->pids_to_lookout_for, (gpointer)p->ID,
                           NULL);
-      g_print("Including ASID %lu program=%s\n", p->Process.ASID,
-              p->Process.ImagePathName);
+      g_print("Including ASID %lu program=%s\n", p->ASID,
+              p->ImagePathName);
       if (start_time == NULL) {
         start_time = malloc(sizeof(struct timespec));
         clock_gettime(CLOCK_MONOTONIC_RAW, start_time);
@@ -114,12 +114,10 @@ WinProcess *get_WinProcess_for_pid(WindowsIntrospecter *w, target_ulong id) {
 WinProcess *wi_current_process(WindowsIntrospecter *w, CPUState *cpu,
                              bool add_process) {
   target_ulong asid = cpu->env_ptr->cr[3];
-  // WinProcessInner is cached
+  // WinProcess is cached
   WinProcess cmpThread = {
-      .Process = {
-          .ID = 0,
-          .ASID = asid,
-      },
+      .ID = 0,
+      .ASID = asid,
       .is_excluded = false
   };
 
@@ -127,7 +125,7 @@ WinProcess *wi_current_process(WindowsIntrospecter *w, CPUState *cpu,
       (WinProcess *)qht_lookup(w->asid_winprocess_map, &cmpThread, asid);
 
   if (!process) {
-    // WinProcessInner is not cached, add it to cache
+    // WinProcess is not cached, add it to cache
     process = wi_extract_process_from_memory(w, cpu, asid);
     if (add_process) {
       wi_add_process(w, asid, process);
@@ -136,12 +134,12 @@ WinProcess *wi_current_process(WindowsIntrospecter *w, CPUState *cpu,
 
   Gemu *gemu = gemu_get_instance();
 
-  if (process == NULL || !g_hash_table_contains(gemu->pids_to_lookout_for, GINT_TO_POINTER(process->Process.ID))) {
+  if (process == NULL || !g_hash_table_contains(gemu->pids_to_lookout_for, GINT_TO_POINTER(process->ID))) {
     return NULL;
   }
 
   if (gemu->tracking_mode & TRACKING_BASICBLOCK){ // This if clause contains code to identify kernel for api hooking
-    if (process->bitness == BITNESS_UNKNOWN && process->Process.ImagePathName[0] != '\0'){
+    if (process->bitness == BITNESS_UNKNOWN && process->ImagePathName[0] != '\0'){
       wi_extract_module_list(cpu, process);
       ModuleNode* current = process->current_modules;
       while (current != NULL) {
@@ -231,16 +229,13 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
 
   WinProcess *newThreadPtr = malloc(sizeof(WinProcess));
   WinProcess newThread = {
+      .ID = teb.ClientId.ProcessId,
+      .ASID = asid,
+      .PEB = peb,
+      .ImagePathName = imagePathName,
+      .ProcessParameters = processParameters,
       .process_handles = g_hash_table_new(NULL, NULL),
       .section_handles = g_hash_table_new(NULL, NULL),
-      .Process =
-          {
-              .ID = teb.ClientId.ProcessId,
-              .ASID = asid,
-              .PEB = peb,
-              .ImagePathName = imagePathName,
-              .ProcessParameters = processParameters,
-          },
       .is_excluded = false,
       .new_sections = new_sections,
       .cache_section = NULL,

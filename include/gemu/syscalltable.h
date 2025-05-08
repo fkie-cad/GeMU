@@ -6,8 +6,8 @@
 #include "glib.h"
 
 // Return char must not be freed, it lives inside the loaded cJSON lookup table.
-const char *lookup_syscall(Gemu *gemu_instance, const WinProcessInner* process, const int syscall_number);
+const char *lookup_syscall(Gemu *gemu_instance, const WinProcess* process, const int syscall_number);
 
-syscall_t lookup_syscall_enum(Gemu *gemu_instance, const int syscall_number, WinProcessInner* (*get_process) (void));
+syscall_t lookup_syscall_enum(Gemu *gemu_instance, const int syscall_number, WinProcess* (*get_process) (void));
 
 #endif //GEMU_SYSCALLTABLE_H

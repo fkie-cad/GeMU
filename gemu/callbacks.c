@@ -141,11 +141,11 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
 
     //getting the memory map
 
-    struct SingleLinkedList* list = getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, process->Process.ID);
+    struct SingleLinkedList* list = getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, process->ID);
     if (list != NULL) {
         bool list_is_empty = iterateAndUpdateList(list, process->new_sections);
         if (list_is_empty == true) {
-            removeList(gemu_instance->mapped_sections_waitinglist, process->Process.ID);
+            removeList(gemu_instance->mapped_sections_waitinglist, process->ID);
         }
     }
     if (getWrittenToFlag(temp_section)) {
@@ -169,11 +169,11 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
         wi_extract_module_list(cpu, process);
         ModuleNode* module = is_within_range(process->current_modules, temp_section->start, temp_section->end);
         if (module != NULL) {
-            sprintf(filename, "dumps/%llu_0x%lx_%s_%lu_dump_nr_%d", process->Process.ID, section->start, module->file,
+            sprintf(filename, "dumps/%llu_0x%lx_%s_%lu_dump_nr_%d", process->ID, section->start, module->file,
                     (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
         }
         else{
-            sprintf(filename, "dumps/%llu_0x%lx_mw_%lu_dump_nr_%d", process->Process.ID, section->start, (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
+            sprintf(filename, "dumps/%llu_0x%lx_mw_%lu_dump_nr_%d", process->ID, section->start, (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
         }
         unsetWrittenFlagForRange(section->start, section->end, process->new_sections);
         counter += 1;
@@ -215,12 +215,12 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb)
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, process, CB_BEFORE_TB_EXEC);
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, process, EXIT_FROM_API);
 
-    // printf("%llu:E,0x%lx,%i\n", process->Process.ID, cpu->env_ptr->eip, tb->size);
+    // printf("%llu:E,0x%lx,%i\n", process->ID, cpu->env_ptr->eip, tb->size);
     return;
 }
 
 
-WinProcessInner* gemu_helper_get_current_process(void){
+WinProcess* gemu_helper_get_current_process(void){
 
     Gemu *gemu_instance = gemu_get_instance();
 
@@ -230,7 +230,7 @@ WinProcessInner* gemu_helper_get_current_process(void){
     if (process == NULL) {
         return NULL;
     }
-    return &process->Process;
+    return process;
 }
 
 
@@ -249,7 +249,7 @@ void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend)
     CPUState *cpu_new = current_cpu;
 
     WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu_new, true);
-    if (process == NULL || !g_hash_table_contains(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(process->Process.ID))) {
+    if (process == NULL || !g_hash_table_contains(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(process->ID))) {
         // Exit early if the current program is not the one we want to watch
         return;
     }
@@ -274,7 +274,7 @@ void gemu_cb_sysret(CPUX86State *cpu)
     CPUState *cpu_new = current_cpu;
 
     WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu_new, true);
-    if (process == NULL || !g_hash_table_contains(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(process->Process.ID))) {
+    if (process == NULL || !g_hash_table_contains(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(process->ID))) {
         // Exit early if the current program is not the one we want to watch
         return;
     }
@@ -306,8 +306,8 @@ void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb)
     //QWORD processid;
     //QWORD threadid;
     //get_current_pid_and_tid(cpu, &processid, &threadid);
-    //printf("%llu:%llu:B:0x%lx,%i\n", process->Process.ID, threadid, cpu->env_ptr->eip, tb->size);
-    //printf("%llu:B:0x%lx,%i\n", process->Process.ID, cpu->env_ptr->eip, tb->size);
+    //printf("%llu:%llu:B:0x%lx,%i\n", process->ID, threadid, cpu->env_ptr->eip, tb->size);
+    //printf("%llu:B:0x%lx,%i\n", process->ID, cpu->env_ptr->eip, tb->size);
 
     check_for_unpacking(cpu, tb, process, gemu_instance);
 }
@@ -340,11 +340,11 @@ void gemu_cb_phys_memory_written(CPUArchState *env, target_ulong addr, uint64_t 
     }
     process->cache_section_written = section;
 
-    struct SingleLinkedList* list = getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, process->Process.ID);
+    struct SingleLinkedList* list = getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, process->ID);
     if (list != NULL) {
         bool list_is_empty = iterateAndUpdateList(list, process->new_sections);
         if (list_is_empty == true) {
-            removeList(gemu_instance->mapped_sections_waitinglist, process->Process.ID);
+            removeList(gemu_instance->mapped_sections_waitinglist, process->ID);
         }
     }
 

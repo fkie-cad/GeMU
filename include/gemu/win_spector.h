@@ -60,15 +60,6 @@ typedef struct _Module_List {
     DWORD Size;
 } Module_List;
 
-typedef struct
-{
-    unsigned long long int ID; // ProcessID
-    char *ImagePathName; // ProcessName
-    ASID ASID;
-    PEB64 PEB;
-    RTL_USER_PROCESS_PARAMETERS64 ProcessParameters;
-    struct Module_List *module_list;
-} WinProcessInner;
 
 typedef enum {BITNESS_UNKNOWN = 0, BITNESS_32 = 1, BITNESS_64 = 2} Bitness;
 
@@ -93,7 +84,12 @@ typedef struct
 } syscall_hook_t;
 typedef struct
 {
-    WinProcessInner Process;
+    unsigned long long int ID; // ProcessID
+    char *ImagePathName; // ProcessName
+    ASID ASID;
+    PEB64 PEB;
+    RTL_USER_PROCESS_PARAMETERS64 ProcessParameters;
+    struct Module_List *module_list;
     bool is_excluded;
     void* process_handles;
     void* section_handles;

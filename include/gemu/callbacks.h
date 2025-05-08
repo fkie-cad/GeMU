@@ -25,7 +25,7 @@ bool convertToSharedWrittenBit(struct MappedMemoryNode* mmapNode, struct DoubleL
 
 bool* getWrittenFlagForNode(struct MappedMemoryNode* mmapNode);
 
-WinProcessInner* gemu_helper_get_current_process(void);
+WinProcess* gemu_helper_get_current_process(void);
 
 void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend);
 
