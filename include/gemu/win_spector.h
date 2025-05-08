@@ -103,7 +103,8 @@ typedef struct
     struct Node* cache_section_written;
     void* current_modules;
     Bitness bitness;
-    syscall_hook_t syscall_return_hook;
+    void* syscall_return_hooks_by_tid;
+    //syscall_hook_t syscall_return_hook;
 } WinProcess;
 
 typedef struct

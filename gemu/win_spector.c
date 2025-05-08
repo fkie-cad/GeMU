@@ -247,7 +247,7 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
       .cache_section_written = NULL,
       .current_modules = NULL,
       .bitness = BITNESS_UNKNOWN,
-      .syscall_return_hook.active = false
+      .syscall_return_hooks_by_tid = g_hash_table_new(NULL, NULL)
   };
   newThread.is_excluded = is_process_excluded(w, &newThread);
   *newThreadPtr = newThread;

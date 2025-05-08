@@ -279,12 +279,15 @@ void gemu_cb_sysret(CPUX86State *cpu)
         return;
     }
 
-    if(process->syscall_return_hook.active == false){
-        // sysret without hooked syscall"
+    QWORD pid, tid;
+    get_current_pid_and_tid(cpu_new, &pid, &tid);
+    syscall_hook_t* return_hook = g_hash_table_lookup(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid));
+    if(return_hook == NULL || return_hook->active == false){
+        // sysret without hooked syscall
         return;
     }
-    pipe_logger_after_syscall_exec(cpu_new, process);
-    process->syscall_return_hook.active = false;
+    pipe_logger_after_syscall_exec(cpu_new, process, return_hook);
+    return_hook->active = false;
 }
 
 void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb)

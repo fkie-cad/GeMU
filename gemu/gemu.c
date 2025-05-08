@@ -602,8 +602,7 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
     printf("adding %lu, %llu to process handles\n", process_handle, client_id.ProcessId);
 }
 
-void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process) {
-    syscall_hook_t* hook = &process->syscall_return_hook;
+void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_hook_t* hook) {
     CPUX86State *env = cpu->env_ptr;
     target_ulong ret = env->regs[R_EAX];
     Gemu *gemu = gemu_get_instance();
@@ -945,7 +944,13 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
     Gemu *gemu_instance = gemu_get_instance();
 
 
-    syscall_hook_t* newHook_ptr = &process->syscall_return_hook; 
+    QWORD pid, tid;
+    get_current_pid_and_tid(cpu, &pid, &tid);
+    syscall_hook_t* newHook_ptr = g_hash_table_lookup(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid));
+    if(newHook_ptr == NULL){
+        newHook_ptr = malloc(sizeof(syscall_hook_t));
+        g_hash_table_insert(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid), newHook_ptr);
+    }
     newHook_ptr->active = true;
     newHook_ptr->out_parameter_list.number_of_outparameters = -2;
     newHook_ptr->syscall_enum = syscall;
@@ -953,7 +958,6 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
     const char *dll_name = "syscall";
 
     const char* func_name = SYSCALL_NAMES[syscall];
-
 
     handle_special_syscall_apis_enum(gemu_instance, cpu, dll_name, syscall, process, newHook_ptr, is32bit);
 

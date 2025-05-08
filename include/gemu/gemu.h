@@ -134,7 +134,7 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
                                      syscall_t syscall, WinProcess *process);
 
 
-void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process);
+void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_hook_t* hook);
 
 void gemu_start_recording(void);
 
