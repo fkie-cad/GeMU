@@ -1,0 +1,18 @@
+# This is an example YAML for the case a malware using DLL sideloading needs to be sandboxed
+
+# samples is a docker-like structure shows which samples should be placed where in the virtual machine
+# $User is the user folder
+# The sample which launches the initial process NEEDS to be called $SAMPLE_NAME.
+
+# CMDs is a list of commands that shall be executed
+# The strings are fed directly into the commandline
+# For example "start $USER/Desktop/evil.exe evilparam" starts the evil.exe and gives the vuln.dll as a parameter
+
+samples:
+  - example/evil.dll:$USERDesktop\\malicious.dll
+  - example/loader.exe:$USERDesktop\\$SAMPLE_NAME
+
+cmds:
+  - start $USERDesktop\\$SAMPLE_NAME
+
+overwriteinitprocess: example.exe

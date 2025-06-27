@@ -1,0 +1,41 @@
+# Source https://www.gaijin.at/en/infos/windows-version-numbers
+Windows XP:
+  SP1: "2600.1105-1106"  # TODO: validate
+  SP2: "2600.2180"  # TODO: validate
+Windows Server 2003:
+  SP0: 3790
+  # TODO: SP1 is missing in syscall table, but has build number "3790.1180"
+  R2: 3790
+  SP2: 3790
+  R2 SP2:  # TODO: not listed in build number source
+Windows Vista:
+  SP0: 6000
+  SP1: 6001
+  SP2: 6002
+Windows 7:
+  SP0: 7600
+  SP1: 7601
+Windows 8:
+  '8.0': 9200
+  '8.1': 9600
+Windows 10:
+  '1507': 10240
+  '1511': 10586
+  '1607': 14393
+  '1703': 15063
+  '1709': 16299
+  '1803': 17134
+  '1809': 17763
+  '1903': 18362
+  '1909': 18363
+  '2004': 19041
+  20H2: 19042
+  21H1: 19043
+  21H2: 19044
+  22H2: 19045
+Windows 11 and Server:
+  Server 2022: 20348
+  11 21H2: 22000
+  11 22H2: 22621
+  11 23H2: 22631
+  Server 23H2: 25398

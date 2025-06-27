@@ -1,0 +1,40 @@
+from pathlib import Path
+
+GEMU_FOLDER = Path(__file__).parent / ".."
+
+# Dicts in the following format can be referenced by name via the --config parameter. E.g. --config win7
+
+win7 = {
+    "VM_IMAGE_PATH": "/path/to/vm",
+    "SNAPSHOT": "dotnet8.0.8+framework4.8fixed",
+    "RAM": "2056",
+    "USER": "C:\\Users\\analyst\\",
+    "SYMBOLMAPPING": (GEMU_FOLDER / "symbol_mapping_win7.txt").as_posix(),
+    "APIDOC": (GEMU_FOLDER / "apidoc.json").as_posix(),
+    "SYSCALLTABLE": (GEMU_FOLDER / "syscalltable.json").as_posix(),
+}
+
+win10 = {
+    "VM_IMAGE_PATH": "/path/to/vm",
+    "SNAPSHOT": "test5",
+    "RAM": "4G",
+    "USER": "C:\\Users\\atlas\\",
+    "PARAMETERS": [
+        "-acpitable",
+        "/path/to/DSDT_OEM.bin",
+    ],
+    "SYMBOLMAPPING": (GEMU_FOLDER / "symbol_mapping_win10.txt").as_posix(),
+    "APIDOC": (GEMU_FOLDER / "apidoc.json").as_posix(),
+    "SYSCALLTABLE": (GEMU_FOLDER / "syscalltable.json").as_posix(),
+}
+
+
+# Copies of similar settings for running muliple instances in parallel can be created like this:
+
+win10_2 = win10.copy()
+win10_2["VM_IMAGE_PATH"] = "/path/to/vm2"
+
+
+# List of setting names can be referenced by --configs in gemu_runner_muliple_files.py
+
+win10_pool = ["win10", "win10_2"]
