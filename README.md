@@ -2,6 +2,7 @@
 ![gemu-logo](gemu-logo_small.jpeg)
 
 This repository contains the code for GeMU, the generic malware unpacker. This unpacker was presented at the WORMA workshop in 2025.
+Please note that this is still a very early version. If you have any questions, suggestions, or feedback please reach out to us!
 
 Citation: Jenke, Thorsten, Max Ufer, Manuel Blatt, Leander Kohler, Elmar Padilla, and Lilli Bruckschen, ``Democratizing Generic Malware Unpacking'' in 2025 IEEE European Symposium on Security and Privacy Workshops (EuroS\&PW), IEEE, 2025. (to appear).
 
