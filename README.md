@@ -117,6 +117,6 @@ An example recipe can be found at `<gemu-repo-dir>/gemu/gemuinteractor/example.y
 
 ## Roadmap
 - [ ] per-thread matching of syscall/sysret pairs
-- [ ] prevent unpacking from failing when mounting takes longer than expected
+- [x] prevent unpacking from failing when mounting takes longer than expected
 - [ ] PE-carving
 - [ ] improve .NET unpacking capabilities
