@@ -85,7 +85,7 @@ void* find_cb_func(hook_t *hook, enum callback cb)
 
 // Calls the callback function if address is hooked.
 // Returns True if hook was found, False if address is not hooked
-bool hkr_try_exec_hook(Hooker *h, target_ulong address, CPUState *cpu, TranslationBlock *tb, WinThread *thread, enum callback cb)
+bool hkr_try_exec_hook(Hooker *h, target_ulong address, CPUState *cpu, TranslationBlock *tb, WinProcess *process, enum callback cb)
 {
     hook_t lookup_hook = {
             .addr = address,
@@ -102,7 +102,7 @@ bool hkr_try_exec_hook(Hooker *h, target_ulong address, CPUState *cpu, Translati
     }
 
     int n = found_hook->out_parameter_list.number_of_outparameters;
-    cb_func(address, cpu, tb, found_hook->dll_name, found_hook->func_name, thread, found_hook->out_parameter_list.out_parameters, n, found_hook->is32bit);
+    cb_func(address, cpu, tb, found_hook->dll_name, found_hook->func_name, process, found_hook->out_parameter_list.out_parameters, n, found_hook->is32bit);
     return true;
 }
 

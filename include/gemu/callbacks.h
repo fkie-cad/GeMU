@@ -17,7 +17,7 @@ void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb);
 
 void update_memory_map_from_env(CPUArchState *env);
 
-void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinThread *thread, Gemu *gemu_instance);
+void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *thread, Gemu *gemu_instance);
 
 bool iterateAndUpdateList(struct SingleLinkedList* singleList, struct DoubleLinkedList* doubleList);
 

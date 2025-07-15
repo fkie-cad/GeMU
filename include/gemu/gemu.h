@@ -55,45 +55,45 @@ Gemu *gemu_get_instance(void);
 void gemu_destroy(void);
 
 bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_name,
-                         const char *func_name, WinThread *thread, out_parameter_list_t* out_parameter_list,
+                         const char *func_name, WinProcess *process, out_parameter_list_t* out_parameter_list,
                          bool is32Bit);
 
-void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinThread *thread,
+void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
                         const char *dll_name, const char *func_name, out_parameter_list_t* out_parameter_list,
                         bool is32Bit);
 
 void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
-                                 WinThread *thread, const char *dll_name,
+                                 WinProcess *process, const char *dll_name,
                                  const char *func_name, out_parameter_list_t* out_parameter_list, bool is32Bit);
 
 void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
-                               WinThread *thread, const char *dll_name,
+                               WinProcess *process, const char *dll_name,
                                const char *func_name, out_parameter_list_t* out_parameter_list, bool is32Bit);
 
-void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinThread *thread,
+void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process,
                                     cJSON *output);
 
-void handle_ZwOpenProcess_Exit(cJSON *output, WinThread *thread);
+void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process);
 
 cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
                              const char *dll_name, int number_of_outparameters,
-                             out_parameter out_parameters[], WinThread *thread);
+                             out_parameter out_parameters[], WinProcess *process);
 
 cJSON *read_out_parameters32(Gemu *gemu, CPUState *cpu, const char *func_name,
                              const char *dll_name, int number_of_outparameters,
-                             out_parameter out_parameters[], WinThread *thread);
+                             out_parameter out_parameters[], WinProcess *process);
 
 cJSON *read_parameters32(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
-                         const char *dll_name, out_parameter_list_t* out_parameter_list, WinThread *thread);
+                         const char *dll_name, out_parameter_list_t* out_parameter_list, WinProcess *process);
 
 cJSON *read_parameters64(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
-                         const char *dll_name, out_parameter_list_t *out_parameter_list, WinThread *thread);
+                         const char *dll_name, out_parameter_list_t *out_parameter_list, WinProcess *process);
 
 void fill_processinformation64(CPUState *cpu, QWORD value,
-                               cJSON *processinformation, WinThread *thread);
+                               cJSON *processinformation, WinProcess *process);
 
 void fill_processinformation32(CPUState *cpu, QWORD value,
-                               cJSON *processinformation, WinThread *thread);
+                               cJSON *processinformation, WinProcess *process);
 
 QWORD get_parameter64(CPUState *cpu, int index);
 
@@ -109,9 +109,9 @@ int count_dereferences(char *s);
 
 char *read_file(const char *filename);
 
-void wi_extract_module_list(CPUState *cpu, WinThread *thread);
+void wi_extract_module_list(CPUState *cpu, WinProcess *process);
 
-void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinThread *thread,
+void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process,
                              int pid);
 
 bool insert_sorted_module_node(ModuleNode **head, ModuleNode *new_node);
@@ -128,13 +128,13 @@ void insert_sorted(Module **head, Module *new_module);
 
 Module *parse_modules(const char *filename);
 
-void try_extract_kernel32_address(Gemu *gemu_instance, CPUState *cpu, WinThread *thread);
+void try_extract_kernel32_address(Gemu *gemu_instance, CPUState *cpu, WinProcess *process);
 
 void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
-                                     syscall_t syscall, WinThread *thread);
+                                     syscall_t syscall, WinProcess *process);
 
 
-void pipe_logger_after_syscall_exec(CPUState *cpu, WinThread* thread);
+void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_hook_t* hook);
 
 void gemu_start_recording(void);
 
