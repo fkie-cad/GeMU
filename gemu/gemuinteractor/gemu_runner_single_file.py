@@ -147,7 +147,6 @@ class GemuRunnerSingleFile:
                 self.early_exiter.join()
             else:
                 self.merge_writtenfiles()
-            self.zip_dumps_folder()
             self.process.stdin.write(b"system_powerdown\n")
             self.process.stdin.write(b"quit\n")
             try:
@@ -158,14 +157,16 @@ class GemuRunnerSingleFile:
             # Cleanup ISO directory
             if self.output_path.parent.exists():
                 shutil.rmtree(self.output_path.parent)
+            self.zip_dumps_folder()
             return self.return_status
             # sys.exit()
 
     def zip_dumps_folder(self):
         dumps_folder = self.analysis_folder / "dumps"
         if dumps_folder.exists():
+            subprocess.run(f"sync '{dumps_folder.as_posix()}'", shell=True)
             shutil.make_archive(dumps_folder.as_posix(), "zip", dumps_folder.as_posix())
-            shutil.rmtree(dumps_folder)
+            shutil.rmtree(dumps_folder, ignore_errors=True)
 
     def log_message(self, message):
         self.log.update(message)
