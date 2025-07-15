@@ -155,6 +155,9 @@ class GemuRunnerSingleFile:
             except subprocess.TimeoutExpired:
                 pass
             self.process.kill()
+            # Cleanup ISO directory
+            if self.output_path.parent.exists():
+                shutil.rmtree(self.output_path.parent)
             return self.return_status
             # sys.exit()
 
@@ -248,7 +251,6 @@ class GemuRunnerSingleFile:
             f" copy D:\\{self.sample_name} {user}Desktop\\{self.sample_name}\n",
             self.process,
         )
-        shutil.rmtree(self.output_path.parent)
         self.process.stdin.flush()
         time.sleep(1)
         self.process.stdin.write(b"gemurec\n")
