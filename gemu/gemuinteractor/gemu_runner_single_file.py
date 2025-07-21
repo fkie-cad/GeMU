@@ -60,7 +60,7 @@ class GemuRunnerSingleFile:
                     self.return_status = f"match({[match.rule for match in matches]},{i})"
                     self.process.kill()
                     return
-    
+
     # not thread safe
     def merge_writtenfiles(self):
         dump_folder = self.analysis_folder / "dumps"
@@ -154,15 +154,11 @@ class GemuRunnerSingleFile:
             except subprocess.TimeoutExpired:
                 pass
             self.process.kill()
-<<<<<<< Updated upstream
             # Cleanup ISO directory
             if self.output_path.parent.exists():
                 shutil.rmtree(self.output_path.parent)
-=======
             self.zip_dumps_folder()
->>>>>>> Stashed changes
             return self.return_status
-            # sys.exit()
 
     def zip_dumps_folder(self):
         dumps_folder = self.analysis_folder / "dumps"
