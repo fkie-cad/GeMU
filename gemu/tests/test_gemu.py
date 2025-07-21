@@ -1,3 +1,4 @@
+import time
 from itertools import product
 from pathlib import Path
 import pytest
@@ -89,4 +90,5 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness,trackingmod
     )
     status = runner.run_sample() 
     assert status.split("(")[0] == "match"
+    time.sleep(3)
     # assert not status.endswith("nr_0)")
