@@ -230,10 +230,9 @@ class GemuRunnerSingleFile:
         guest_type(f"start {user}Desktop\\{self.sample_name} ahsofidll.dll,{self.export}\n", self.process)
 
     def mount_sample(self):
-        self.output_path = Path(Path(self.sample).name.replace(" ", "") + ".iso")
-        self.output_path = build_iso_from_file(
-            Path(self.sample), sample_name=self.sample_name, iso_output_path=self.output_path
-        )
+        self.output_path = build_iso_from_file(Path(self.sample),
+                                               sample_name=self.sample_name,
+                                               iso_output_path=Path(Path(self.sample).name.replace(" ", "") + ".iso"))
         cmd = f"change ide1-cd0 {self.output_path}\n".encode(encoding="utf-8")
         print(cmd)
         self.process.stdin.write(cmd)
