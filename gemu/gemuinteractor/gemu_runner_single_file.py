@@ -163,6 +163,7 @@ class GemuRunnerSingleFile:
     def zip_dumps_folder(self):
         dumps_folder = self.analysis_folder / "dumps"
         if dumps_folder.exists():
+            subprocess.run(f"sync '{dumps_folder.as_posix()}'", shell=True)
             shutil.make_archive(dumps_folder.as_posix(), "zip", dumps_folder.as_posix())
             shutil.rmtree(dumps_folder, ignore_errors=True)
 
