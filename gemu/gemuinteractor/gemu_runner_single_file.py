@@ -60,7 +60,7 @@ class GemuRunnerSingleFile:
                     self.return_status = f"match({[match.rule for match in matches]},{i})"
                     self.process.kill()
                     return
-    
+
     # not thread safe
     def merge_writtenfiles(self):
         dump_folder = self.analysis_folder / "dumps"
@@ -147,7 +147,6 @@ class GemuRunnerSingleFile:
                 self.early_exiter.join()
             else:
                 self.merge_writtenfiles()
-            self.zip_dumps_folder()
             self.process.stdin.write(b"system_powerdown\n")
             self.process.stdin.write(b"quit\n")
             try:
@@ -158,14 +157,14 @@ class GemuRunnerSingleFile:
             # Cleanup ISO directory
             if self.output_path.parent.exists():
                 shutil.rmtree(self.output_path.parent)
+            self.zip_dumps_folder()
             return self.return_status
-            # sys.exit()
 
     def zip_dumps_folder(self):
         dumps_folder = self.analysis_folder / "dumps"
         if dumps_folder.exists():
             shutil.make_archive(dumps_folder.as_posix(), "zip", dumps_folder.as_posix())
-            shutil.rmtree(dumps_folder)
+            shutil.rmtree(dumps_folder, ignore_errors=True)
 
     def log_message(self, message):
         self.log.update(message)
@@ -261,14 +260,16 @@ class GemuRunnerSingleFile:
 
     def try_to_free_image(self):
         lock_found, qemu_pid = self.check_qcow_lock()
-        if lock_found:
+        while lock_found:
             self.kill_qemu_process(qemu_pid)
-        else:
-            print("No QEMU process holding write lock on", self.vm_config.image, "found.")
+            print("checking lock again")
+            lock_found, qemu_pid = self.check_qcow_lock()
+        print("No QEMU process holding write lock on", self.vm_config.image, "found.")
 
     def check_qcow_lock(self):
         try:
             output = subprocess.check_output(["lsof", "-F", "npk", self.vm_config.image])
+            print(output)
             lines = output.decode().split("\n")
             pid = None
             locked = False
@@ -284,6 +285,7 @@ class GemuRunnerSingleFile:
     def kill_qemu_process(self, pid):
         try:
             subprocess.run(["kill", "-9", pid], check=True)
-            print("QEMU process with PID", pid, "has been terminated.")
+            print("QEMU process with PID", pid, "has been terminated. Sleeping for 5 seconds")
+            time.sleep(5)
         except subprocess.CalledProcessError:
             print("Failed to terminate QEMU process with PID", pid)
