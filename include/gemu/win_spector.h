@@ -60,16 +60,6 @@ typedef struct _Module_List {
     DWORD Size;
 } Module_List;
 
-typedef struct
-{
-    unsigned long long int ID; // ProcessID
-    char *ImagePathName; // ProcessName
-    ASID ASID;
-    PEB64 PEB;
-    RTL_USER_PROCESS_PARAMETERS64 ProcessParameters;
-    struct Module_List *module_list;
-    GHashTable *stack_depth;
-} WinProcess;
 
 typedef enum {BITNESS_UNKNOWN = 0, BITNESS_32 = 1, BITNESS_64 = 2} Bitness;
 
@@ -94,8 +84,12 @@ typedef struct
 } syscall_hook_t;
 typedef struct
 {
-    unsigned long long int ThreadId;
-    WinProcess Process;
+    unsigned long long int ID; // ProcessID
+    char *ImagePathName; // ProcessName
+    ASID ASID;
+    PEB64 PEB;
+    RTL_USER_PROCESS_PARAMETERS64 ProcessParameters;
+    struct Module_List *module_list;
     bool is_excluded;
     void* process_handles;
     void* section_handles;
@@ -105,13 +99,14 @@ typedef struct
     struct Node* cache_section_written;
     void* current_modules;
     Bitness bitness;
-    syscall_hook_t syscall_return_hook;
-} WinThread;
+    void* syscall_return_hooks_by_tid;
+    //syscall_hook_t syscall_return_hook;
+} WinProcess;
 
 typedef struct
 {
-    struct qht *asid_winthread_map;
-    void* pid_winthread_map;
+    struct qht *asid_winprocess_map;
+    void* pid_winprocess_map;
     char *watched_programs;
 } WindowsIntrospecter;
 
@@ -121,29 +116,24 @@ WindowsIntrospecter *init_windows_introspecter(int bucket_size, const char *watc
 
 void wi_destroy(WindowsIntrospecter *w);
 
-void wi_add_thread(WindowsIntrospecter *w, target_ulong asid, WinThread *winthread);
+void wi_add_process(WindowsIntrospecter *w, target_ulong asid, WinProcess *WinProcess);
 
-WinThread *wi_current_thread(WindowsIntrospecter *w, CPUState *cpu, bool addthread);
+WinProcess *wi_current_process(WindowsIntrospecter *w, CPUState *cpu, bool addthread);
 
-WinThread *wi_extract_thread_from_memory(WindowsIntrospecter *w, CPUState *cpu, target_ulong asid);
+WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu, target_ulong asid);
 
-WinThread *wi_extract_thread_from_memory_with_env(WindowsIntrospecter *w, CPUArchState *env, target_ulong asid);
+WinProcess *wi_extract_process_from_memory_with_env(WindowsIntrospecter *w, CPUArchState *env, target_ulong asid);
 
-WinThread *get_winthread_for_pid(WindowsIntrospecter *w, target_ulong id);
+WinProcess *get_WinProcess_for_pid(WindowsIntrospecter *w, target_ulong id);
 
 void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid);
 
 void get_pid_and_tid_from_teb_address(target_ulong teb_address, CPUState *cpu, QWORD *processid, QWORD *threadid);
 
-char* get_stack_depth_indicator(WinThread *thread);
+void print_memory_map(CPUState *cpu, WinProcess *thread);
 
-void print_memory_map(CPUState *cpu, WinThread *thread);
+bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p);
 
-bool is_thread_excluded(WindowsIntrospecter *w, WinThread *t);
-
-struct qht *init_asid_winthread_map(int bucket_size);
-
-void free_value(gpointer data);
-
+struct qht *init_asid_WinProcess_map(int bucket_size);
 
 #endif //GEMU_WIN_SPECTOR_HPP

@@ -68,7 +68,7 @@ static GHashTable *get_syscalls_for_build_enum(Gemu *gemu_instance, const WinPro
 syscall_t lookup_syscall_enum(Gemu *gemu_instance, const int syscall_number, WinProcess* (*get_process) (void)) {
     const GHashTable *syscalls_for_build_enum = gemu_instance->syscall_lookup_for_build_enum;
     if(!syscalls_for_build_enum){
-        WinProcess * process = get_process();
+        WinProcess* process = get_process();
         if(!process){
             return UNKNOWN_SYSCALL;
         }

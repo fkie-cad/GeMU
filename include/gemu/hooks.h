@@ -36,7 +36,7 @@ typedef struct
 } hook_t;
 
 typedef void (*hook_callback_func)(target_ulong pc, CPUState *cpu, TranslationBlock *tb, char *dll_name,
-                                   char *func_name, WinThread *thread, out_parameter out_parameters[], int number_of_outparameters, bool is32bit);
+                                   char *func_name, WinProcess *process, out_parameter out_parameters[], int number_of_outparameters, bool is32bit);
 
 typedef struct
 {
@@ -55,7 +55,7 @@ bool hkr_add_new_hook(Hooker *h, hook_t hook);
 
 bool hkr_remove_hook(Hooker *h, target_ulong pc);
 
-bool hkr_try_exec_hook(Hooker *h, target_ulong address, CPUState *cpu, TranslationBlock *tb, WinThread *thread, enum callback cb);
+bool hkr_try_exec_hook(Hooker *h, target_ulong address, CPUState *cpu, TranslationBlock *tb, WinProcess *process, enum callback cb);
 
 void* find_cb_func(hook_t *hook, enum callback cb);
 
