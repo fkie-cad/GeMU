@@ -115,14 +115,14 @@ WinProcess *wi_current_process(WindowsIntrospecter *w, CPUState *cpu,
                              bool add_process) {
   target_ulong asid = cpu->env_ptr->cr[3];
   // WinProcess is cached
-  WinProcess cmpThread = {
+  WinProcess cmpProcess = {
       .ID = 0,
       .ASID = asid,
       .is_excluded = false
   };
 
   WinProcess *process =
-      (WinProcess *)qht_lookup(w->asid_winprocess_map, &cmpThread, asid);
+      (WinProcess *)qht_lookup(w->asid_winprocess_map, &cmpProcess, asid);
 
   if (!process) {
     // WinProcess is not cached, add it to cache
