@@ -15,8 +15,8 @@ class VMConfig:
     apidoc: Path
     syscalltable: Path
 
-def get_vm_settings(name):
-    vm_settings = getattr(gemuinteractor.config, name)
+def get_vm_settings(name, file=gemuinteractor.config):
+    vm_settings = getattr(file, name)
     return VMConfig(
         Path(vm_settings["VM_IMAGE_PATH"]),
         vm_settings["SNAPSHOT"],

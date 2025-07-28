@@ -3,6 +3,7 @@ import os
 
 from gemuinteractor.config_parser import get_vm_settings
 from gemuinteractor.gemu_runner_single_file import GemuRunnerSingleFile
+from gemuinteractor.helpers import GemuInstance
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -25,5 +26,6 @@ if __name__ == "__main__":
     parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar= "syscall|basicblock|both", type=str)
     args = parser.parse_args()
     vm_config = get_vm_settings(args.config)
-    runner = GemuRunnerSingleFile(os.path.abspath(args.sample), args.time, args.runname, args.export, args.yararules, args.trackingmode, args.dotnet, vm_config)
+    runner = GemuRunnerSingleFile(os.path.abspath(args.sample), args.time, args.runname, args.export,
+                                  args.yararules, args.trackingmode, args.dotnet, vm_config, GemuInstance(vm_config.image))
     runner.run_sample()

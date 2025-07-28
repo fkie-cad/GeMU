@@ -19,7 +19,7 @@ class GemuRunnerWithRecipe(GemuRunnerSingleFile):
         print(self.sampleyaml)
         self.recording_time = recording_time
         self.runname = runname
-        self.analysis_folder = self.build_analysis_folder()
+        self.analysis_folder = self._build_analysis_folder()
         self.trackingmode = trackingmode
         self.dotnet = dotnet
         self.rules = None
@@ -38,12 +38,12 @@ class GemuRunnerWithRecipe(GemuRunnerSingleFile):
             instring = instring.replace(replacing[0], replacing[1])
         return instring
 
-    def build_analysis_folder(self):
+    def _build_analysis_folder(self):
         analysis_folder = Path(f"{self.sampleyamlfile}_{self.runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
         analysis_folder.mkdir(exist_ok=True)
         return analysis_folder
 
-    def mount_sample(self):
+    def _mount_sample(self):
         time.sleep(5)
         output_paths = set()
         for sample in self.sampleyaml["samples"]:
@@ -57,27 +57,27 @@ class GemuRunnerWithRecipe(GemuRunnerSingleFile):
             output_paths.add(output_path)
             cmd = f"change ide1-cd0 {output_path}\n".encode(encoding="utf-8")
             print(cmd)
-            self.process.stdin.write(cmd)
-            self.process.stdin.flush()
+            self.gemu_instance.stdin.write(cmd)
+            self.gemu_instance.stdin.flush()
             print("mounting")
             time.sleep(2)
-            self.process.stdin.write(b"sendkey esc\n")
+            self.gemu_instance.stdin.write(b"sendkey esc\n")
             guest_type(
                 f"   copy D:\\{guest_sample_name} {guest_sample}\n",
-                self.process,
+                self.gemu_instance,
             )
             time.sleep(2)
         time.sleep(5)
         for p in output_paths:
             shutil.rmtree(p.parent)
 
-    def launch_sample(self):
+    def _launch_sample(self):
         time.sleep(5)
-        self.process.stdin.write(b"gemurec\n")
-        self.process.stdin.flush()
+        self.gemu_instance.stdin.write(b"gemurec\n")
+        self.gemu_instance.stdin.flush()
         print("starting...")
-        self.process.stdin.write(b"sendkey esc\n")
-        self.process.stdin.flush()
+        self.gemu_instance.stdin.write(b"sendkey esc\n")
+        self.gemu_instance.stdin.flush()
         for command in self.sampleyaml["cmds"]:
             normalized_cmd = self.replace_constants(command)
-            guest_type(normalized_cmd + "\n", self.process)
+            guest_type(normalized_cmd + "\n", self.gemu_instance)
