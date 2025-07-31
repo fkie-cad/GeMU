@@ -1,7 +1,9 @@
 import argparse
 import os
+from pathlib import Path
 
 from gemuinteractor.config_parser import get_vm_settings
+from gemuinteractor.gemu_run_decorator import YaraEarlyExiter, WrittenFileMerger
 from gemuinteractor.gemu_runner_single_file import GemuRunnerSingleFile
 from gemuinteractor.helpers import GemuInstance
 
@@ -26,6 +28,10 @@ if __name__ == "__main__":
     parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar= "syscall|basicblock|both", type=str)
     args = parser.parse_args()
     vm_config = get_vm_settings(args.config)
-    runner = GemuRunnerSingleFile(os.path.abspath(args.sample), args.time, args.runname, args.export,
-                                  args.yararules, args.trackingmode, args.dotnet, vm_config, GemuInstance(vm_config.image))
+    runner = GemuRunnerSingleFile(Path(os.path.abspath(args.sample)), args.time, args.runname, args.export, args.trackingmode,
+                                  args.dotnet, vm_config, GemuInstance(vm_config.image))
+    decorators = [WrittenFileMerger(sleep=2, runner=runner)]
+    if args.yararules:
+        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=args.yararules, runner=runner))
+    runner.decorate_run(decorators)
     runner.run_sample()

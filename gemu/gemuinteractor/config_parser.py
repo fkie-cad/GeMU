@@ -29,5 +29,5 @@ def get_vm_settings(name, file=gemuinteractor.config):
     )
 
 SAMPLE_NAME = "ahsofi.exe"
-GEMU_FOLDER = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-GEMU_PATH = os.path.join(GEMU_FOLDER, "build", "qemu-system-x86_64")
+GEMU_FOLDER = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+GEMU_PATH = GEMU_FOLDER / "build" / "qemu-system-x86_64"

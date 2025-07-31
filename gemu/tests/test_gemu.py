@@ -77,16 +77,7 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness,trackingmod
 
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
     yararules = (TEST_FOLDER/"shellcode.yarc").as_posix()
-    runner = GemuRunnerSingleFile(
-        sample_path,
-        120,
-        RUNNAME,
-        None,
-        yararules,
-        trackingmode,
-        "off",
-        get_vm_settings("win10")
-    )
+    runner = GemuRunnerSingleFile(sample_path, 120, RUNNAME, None, trackingmode, "off", get_vm_settings("win10"),,
     status = runner.run_sample() 
     assert status.split("(")[0] == "match"
     time.sleep(3)
