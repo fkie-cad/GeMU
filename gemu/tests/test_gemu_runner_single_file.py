@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from gemuinteractor.config_parser import VMConfig
 from gemuinteractor.gemu_run_decorator import RunDecorator
-from gemuinteractor.gemu_runner_single_file import GemuRunnerSingleFile
+from gemuinteractor.gemu_runner_single_file import GemuRunner
 
 SAMPLE_NAME = "testsample.exe"
 SAMPLE_PATH = "/path/to/sample"
@@ -104,8 +104,8 @@ class TestGemuRunnerSingleFile:
         with patch('datetime.datetime') as mock_datetime:
             mock_now = mock_datetime.now.return_value
             mock_now.strftime.return_value = TIMESTAMP
-            return GemuRunnerSingleFile(sample_path, UNPACKING_TIME, RUNNAME, export, TRACKINGMODE, DOTNET, vm_config,
-                                        gemu_instance, gemu_path=GEMU_PATH, sample_name=SAMPLE_NAME)
+            return GemuRunner(sample_path, UNPACKING_TIME, RUNNAME, export, TRACKINGMODE, DOTNET, vm_config,
+                              gemu_instance, gemu_path=GEMU_PATH, sample_name=SAMPLE_NAME)
 
     def test_command_without_export(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)

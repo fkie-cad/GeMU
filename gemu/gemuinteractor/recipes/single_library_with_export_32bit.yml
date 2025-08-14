@@ -1,0 +1,6 @@
+samples:
+  - $INPUTBINARY:$USER\\Desktop\\ahsofidll.dll
+
+cmds:
+  - copy C:\\Windows\\SysWOW64\\rundll32.exe $USER\\Desktop\\$SAMPLE_NAME
+  - start $USER\\Desktop\\$SAMPLE_NAME ahsofidll.dll,$EXPORT

@@ -1,22 +1,23 @@
 import shutil
+import threading
 import time
 from collections import defaultdict
 from pathlib import Path
 
-from gemuinteractor.gemu_runner_single_file import GemuRunnerSingleFile
+from gemuinteractor.helpers import GemuInstance
 
 
 class RunDecorator:
-    def __init__(self, sleep: int, runner: GemuRunnerSingleFile):
-        self.sleep = sleep
-        self.runner = runner
+    def __init__(self, sleep: int, gemu_instance: GemuInstance):
+        self._sleep = sleep
+        self._gemu_instance = gemu_instance
         self._stop_decorator = False
-        self.thread = None
+        self._thread = None
 
-    def run(self):
+    def _run(self):
         while True:
             self._decorate()
-            time.sleep(self.sleep)
+            time.sleep(self._sleep)
             if self._stop_decorator:
                 break
         self._decorate()
@@ -24,13 +25,19 @@ class RunDecorator:
     def stop(self):
         self._stop_decorator = True
 
-    # abstract...    
+    def join(self):
+        self._thread.join()
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run)
+        self._thread.start()
+
     def _decorate(self):
-        pass
+        raise NotImplementedError
 
 class YaraEarlyExiter(RunDecorator):
-    def __init__(self, sleep, yara_rules, runner: GemuRunnerSingleFile):
-        super().__init__(sleep, runner)
+    def __init__(self, sleep, yara_rules, gemu_instance: GemuInstance):
+        super().__init__(sleep, gemu_instance)
         self.yara_rules = yara_rules
         self.return_status = None
         self._init_scanner()
@@ -40,7 +47,7 @@ class YaraEarlyExiter(RunDecorator):
         print("getting rules")
         self.rules = yara.load(self.yara_rules)
         self.checked_files = set()
-        self.dump_folder = self.runner.analysis_folder.dumps_folder / "dumps"
+        self.dump_folder = self._gemu_instance.analysis_folder.dumps_folder
 
     def _decorate(self):
         if not self.dump_folder.exists():
@@ -50,19 +57,17 @@ class YaraEarlyExiter(RunDecorator):
                 continue
             print(f"checking file {i.as_posix()}")
             matches = self.rules.match(i.as_posix())
-            if not matches:
-                self.checked_files.add(i.as_posix())
-            else:
+            self.checked_files.add(i.as_posix())
+            if matches:
                 print(f"Found {[match.rule for match in matches]} in {i}")
                 print("Exiting early")
                 self.return_status = f"match({[match.rule for match in matches]},{i})"
-                self.runner.gemu_instance.kill(self.return_status)
-                self.stop()
-                return
+                self._gemu_instance.kill(self.return_status)
+            return
     
 class WrittenFileMerger(RunDecorator):
     def _decorate(self):
-        dump_folder = self.runner.analysis_folder.dumps_folder
+        dump_folder = self._gemu_instance.analysis_folder.dumps_folder
         if not dump_folder.exists():
             return
 

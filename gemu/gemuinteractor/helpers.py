@@ -21,7 +21,7 @@ class AnalysisFolder:
             f"{sample_path.as_posix()}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
         )
         analysis_folder.mkdir(exist_ok=True)
-        os.symlink(sample_path, f"{self.analysis_folder}/sample")
+        os.symlink(sample_path, f"{analysis_folder}/sample")
         return analysis_folder
 
     def zip_dumps_folder(self):
@@ -66,6 +66,7 @@ class GemuInstance:
         self._log_return_status()
 
     def _log_return_status(self):
+        return
         with open(self.analysis_folder.runlog, "a+") as file:
             file.write(f"return_status:\n{self.return_status}\n")
             
@@ -167,11 +168,12 @@ class GemuInstance:
             self.write_to_qemu_console(b"sendkey " + key.encode(encoding="utf-8") + b"\n")
             time.sleep(0.001)
 
-def build_iso_from_file(sample: Path, sample_name: str, tmpdir: str = "/tmp/"):
+def build_iso_from_files(samples: set[Path], tmpdir):
     tmpdir = Path(tmpdir)
-    tmp_sample = tmpdir / sample_name
-    shutil.copy(sample.absolute(), tmp_sample)
-    temp_iso = tmpdir / Path(sample.name.replace(" ", "") + ".iso")
+    for sample in samples:
+        tmp_sample = tmpdir / sample.name
+        shutil.copy(sample.absolute(), tmp_sample)
+    temp_iso = tmpdir / Path(tmpdir.as_posix().replace(" ", "") + ".iso")
     subprocess.check_call([
         "/usr/bin/genisoimage",
         "-quiet",
@@ -182,6 +184,6 @@ def build_iso_from_file(sample: Path, sample_name: str, tmpdir: str = "/tmp/"):
         "-J",
         "-o",
         temp_iso.as_posix(),
-        tmp_sample.as_posix(),
+        tmpdir.as_posix(),
     ])
     return temp_iso

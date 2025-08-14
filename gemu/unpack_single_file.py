@@ -4,8 +4,9 @@ from pathlib import Path
 
 from gemuinteractor.config_parser import get_vm_settings, GEMU_PATH
 from gemuinteractor.gemu_run_decorator import YaraEarlyExiter, WrittenFileMerger
-from gemuinteractor.gemu_runner_single_file import GemuRunnerSingleFile
+from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
+from gemuinteractor.recipe_selector import get_recipe
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -29,12 +30,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     vm_config = get_vm_settings(args.config)
     sample_path = Path(os.path.abspath(args.sample))
+    recipe = get_recipe(sample=sample_path, export=args.export)
     analysis_folder = AnalysisFolder(args.runname, sample_path)
-    runner = GemuRunnerSingleFile(sample_path, args.time, args.export, args.trackingmode,
-                                  args.dotnet, vm_config, GemuInstance(vm_config.image, GEMU_PATH, analysis_folder))
-    decorators = [WrittenFileMerger(sleep=2, runner=runner)]
+    gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
+    runner = GemuRunner(sample=sample_path, recording_time=args.time, export=args.export, trackingmode=args.trackingmode,
+                        dotnet=args.dotnet, vm_config=vm_config, gemu_instance=gemu_instance, recipe=recipe)
+    decorators = [WrittenFileMerger(sleep=2, gemu_instance=gemu_instance)]
     if args.yararules:
-        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=args.yararules, runner=runner))
+        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=args.yararules, gemu_instance=gemu_instance))
     runner.decorate_run(decorators)
     runner.run_sample()
     analysis_folder.zip_dumps_folder()
