@@ -10,17 +10,21 @@ class RunDecorator:
     def __init__(self, sleep: int, runner: GemuRunnerSingleFile):
         self.sleep = sleep
         self.runner = runner
-        self.stop_decorator = False
+        self._stop_decorator = False
         self.thread = None
 
     def run(self):
         while True:
             self._decorate()
             time.sleep(self.sleep)
-            if self.runner.stop_decorators:
+            if self._stop_decorator:
                 break
         self._decorate()
 
+    def stop(self):
+        self._stop_decorator = True
+
+    # abstract...    
     def _decorate(self):
         pass
 
@@ -29,35 +33,36 @@ class YaraEarlyExiter(RunDecorator):
         super().__init__(sleep, runner)
         self.yara_rules = yara_rules
         self.return_status = None
+        self._init_scanner()
 
-    def run(self):
+    def _init_scanner(self):
         import yara
         print("getting rules")
         self.rules = yara.load(self.yara_rules)
-        checked_files = set()
-        dump_folder = self.runner.analysis_folder / "dumps"
-        while not self.runner.stop_decorators:
-            time.sleep(2)
-            if not dump_folder.exists():
+        self.checked_files = set()
+        self.dump_folder = self.runner.analysis_folder.dumps_folder / "dumps"
+
+    def _decorate(self):
+        if not self.dump_folder.exists():
+            return
+        for i in self.dump_folder.iterdir():
+            if i.as_posix() in self.checked_files:
                 continue
-            for i in dump_folder.iterdir():
-                if i.as_posix() in checked_files:
-                    continue
-                print(f"checking file {i.as_posix()}")
-                matches = self.rules.match(i.as_posix())
-                if not matches:
-                    checked_files.add(i.as_posix())
-                else:
-                    print(f"Found {[match.rule for match in matches]} in {i}")
-                    print("Exiting early")
-                    self.return_status = f"match({[match.rule for match in matches]},{i})"
-                    self.runner.gemu_instance.process.kill()
-                    return
-
-
+            print(f"checking file {i.as_posix()}")
+            matches = self.rules.match(i.as_posix())
+            if not matches:
+                self.checked_files.add(i.as_posix())
+            else:
+                print(f"Found {[match.rule for match in matches]} in {i}")
+                print("Exiting early")
+                self.return_status = f"match({[match.rule for match in matches]},{i})"
+                self.runner.gemu_instance.kill(self.return_status)
+                self.stop()
+                return
+    
 class WrittenFileMerger(RunDecorator):
     def _decorate(self):
-        dump_folder = self.runner.analysis_folder / "dumps"
+        dump_folder = self.runner.analysis_folder.dumps_folder
         if not dump_folder.exists():
             return
 

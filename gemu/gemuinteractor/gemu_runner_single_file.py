@@ -8,19 +8,17 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from gemuinteractor.config_parser import VMConfig, SAMPLE_NAME, GEMU_PATH
+from gemuinteractor.config_parser import VMConfig, SAMPLE_NAME
 from gemuinteractor.helpers import build_iso_from_file, GemuInstance
 
 
 class GemuRunnerSingleFile:
-    def __init__(self, sample: Path, recording_time, runname, export, trackingmode, dotnet, vm_config: VMConfig,
-                 gemu_instance: GemuInstance, gemu_path=GEMU_PATH, sample_name=SAMPLE_NAME):
+    def __init__(self, sample: Path, recording_time, export, trackingmode, dotnet, vm_config: VMConfig,
+                 gemu_instance: GemuInstance, sample_name=SAMPLE_NAME):
         self.sample = sample
         self.export = export
-        self.gemu_path = gemu_path
         self.sample_name = sample_name
-        self.analysis_folder = self._build_analysis_folder(runname)
-        self.gemu_cmd = self._build_gemu_cmd(dotnet, trackingmode, vm_config)
+        self.gemu_cmd = self._get_gemu_params(dotnet, trackingmode, vm_config)
         self.user = vm_config.user
         self.recording_time = recording_time
         self.gemu_instance = gemu_instance
@@ -31,12 +29,11 @@ class GemuRunnerSingleFile:
     def decorate_run(self, decorators):
         self._decorators = decorators
 
-    def _build_gemu_cmd(self, dotnet, trackingmode, vm_config):
+    def _get_gemu_params(self, dotnet, trackingmode, vm_config):
         trackingmode = "-trackingmode " + trackingmode if trackingmode else ""
         dotnet = "-dotnet " + dotnet if dotnet else ""
         return " ".join(
             [
-                self.gemu_path.as_posix(),
                 "-m", vm_config.ram_size,
                 "-monitor stdio",
                 *vm_config.additional_parameters,
@@ -48,31 +45,11 @@ class GemuRunnerSingleFile:
                 trackingmode,
                 dotnet,
                 vm_config.image.as_posix(),
-                f"> {self.analysis_folder}/runlog",
             ]
         )
 
-    def _zip_dumps_folder(self):
-        dumps_folder = self.analysis_folder / "dumps"
-        if dumps_folder.exists():
-            subprocess.run(f"sync '{dumps_folder.as_posix()}'", shell=True)
-            shutil.make_archive(dumps_folder.as_posix(), "zip", dumps_folder.as_posix())
-            shutil.rmtree(dumps_folder, ignore_errors=True)
-
-    def _build_analysis_folder(self, runname):
-        if self.export:
-            analysis_folder = Path(
-            f"{self.sample.as_posix()}_EXPORT:{self.export}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            )
-        else:
-            analysis_folder = Path(
-                f"{self.sample.as_posix()}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            )
-        analysis_folder.mkdir(exist_ok=True)
-        return analysis_folder
-
     @contextmanager
-    def _mount_sample(self):
+    def _mount_sample(self): # move to gemu instance?
         print("mounting sample...")
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
@@ -86,8 +63,6 @@ class GemuRunnerSingleFile:
                 return
 
     def _launch_sample(self):
-        self.analysis_folder.mkdir(exist_ok=True)
-        os.symlink(self.sample, f"{self.analysis_folder}/sample")
         if self.export:
             self._launch_sample_with_export()
             return
@@ -122,21 +97,9 @@ class GemuRunnerSingleFile:
 
     def run_sample(self):
         self._start_decorators()
-        with self.gemu_instance.launch_gemu(self.gemu_cmd, self.analysis_folder):
+        with self.gemu_instance.launch_gemu(self.gemu_cmd):
             print("launching gemu")
             with self._mount_sample():
                 self._launch_sample()
-                try:
-                    print(
-                        f"{datetime.datetime.now()} sleeping for {self.recording_time}"
-                    )
-                    self.gemu_instance.wait(timeout=self.recording_time)
-                    print("sleep over.. shutting down")
-                except subprocess.TimeoutExpired:
-                    print("timeout expired.. shutting down")
-                    self.return_status = "timeout"
-        if self.return_status == "normal" and self.gemu_instance.get_return_code() != 0:
-            self.return_status = f"error({self.gemu_instance.get_return_code()})"
+                self.gemu_instance.wait(timeout=self.recording_time)
         self._join_decorators()
-        self._zip_dumps_folder()
-        return self.return_status
