@@ -39,7 +39,6 @@ class YaraEarlyExiter(RunDecorator):
     def __init__(self, sleep, yara_rules, gemu_instance: GemuInstance):
         super().__init__(sleep, gemu_instance)
         self.yara_rules = yara_rules
-        self.return_status = None
         self._init_scanner()
 
     def _init_scanner(self):
@@ -61,8 +60,7 @@ class YaraEarlyExiter(RunDecorator):
             if matches:
                 print(f"Found {[match.rule for match in matches]} in {i}")
                 print("Exiting early")
-                self.return_status = f"match({[match.rule for match in matches]},{i})"
-                self._gemu_instance.kill(self.return_status)
+                self._gemu_instance.kill(f"match({[match.rule for match in matches]},{i})")
             return
     
 class WrittenFileMerger(RunDecorator):

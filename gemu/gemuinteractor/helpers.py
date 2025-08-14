@@ -4,6 +4,7 @@ import shutil
 import string
 import subprocess
 import sys
+import traceback
 from threading import Lock
 import time
 from contextlib import contextmanager
@@ -48,11 +49,7 @@ class GemuInstance:
         time.sleep(5)
 
     def kill(self, reason: str|None = None):
-        if reason:
-            self.return_status = reason 
-        with self._lock:
-            if self.process.poll() is not None: # if process is NOT running
-                return
+        if self._lock.acquire_lock(blocking=False): #only first kill will be executed and logged
             try:
                 self.write_to_qemu_console(b"system_powerdown\n")
                 self.write_to_qemu_console(b"quit\n")
@@ -63,12 +60,12 @@ class GemuInstance:
             except subprocess.TimeoutExpired:
                 pass
             self.process.kill()
-        self._log_return_status()
+            self._log_return_status(reason, self.process.poll())
 
-    def _log_return_status(self):
-        return
-        with open(self.analysis_folder.runlog, "a+") as file:
-            file.write(f"return_status:\n{self.return_status}\n")
+    def _log_return_status(self, status, return_code):
+        with open(self.analysis_folder.runlog, "a") as f:
+            f.write(f"EXIT STATUS: {str(status)}\n")
+            f.write(f"PROCESS RETURN CODE: {str(return_code)}\n")
             
     def _try_to_free_image(self):
         lock_found, qemu_pid = self._check_qcow_lock()
@@ -107,11 +104,10 @@ class GemuInstance:
         try:
             self._launch(params_string)
             yield True
+        except Exception as e:
+            self.kill(f"error({traceback.format_exc()})")
         finally:
-            self.kill()
-
-        if self.return_status == "normal" and self.gemu_instance.get_return_code() != 0:
-            self.return_status = f"error({self.gemu_instance.get_return_code()})" #die variable ist blöd -> return code pro decorator?
+            self.kill("normal")
 
     def write_to_qemu_console(self, command):
         self.process.stdin.write(command)
