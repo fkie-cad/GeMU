@@ -48,7 +48,7 @@ class GemuInstance:
         )
         time.sleep(5)
 
-    def kill(self, reason: str|None = None):
+    def kill(self, reason: str = "unknown reason"):
         if self._lock.acquire_lock(blocking=False): #only first kill will be executed and logged
             try:
                 self.write_to_qemu_console(b"system_powerdown\n")
