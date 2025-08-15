@@ -3,7 +3,6 @@ import os
 import shutil
 import string
 import subprocess
-import sys
 import traceback
 from threading import Lock
 import time
