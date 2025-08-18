@@ -1,8 +1,10 @@
 import shutil
+import yaml
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from gemuinteractor.recipe import Recipe
 from gemuinteractor.config_parser import VMConfig
 from gemuinteractor.gemu_run_decorator import RunDecorator
 from gemuinteractor.gemu_runner_single_file import GemuRunner
@@ -44,22 +46,21 @@ TEST_CONFIG = {
 }
 
 class GemuInstanceMock:
-    def __init__(self, image):
-        self.image = image
+    def __init__(self):
         self.return_code = 0
         self.written_to_qemu_console = []
         self.typed_into_guest = []
         self.sent_to_gemu = []
-        self.cmd = None
-        self.cwd = None
         self.waited = None
 
     @contextmanager
-    def launch_gemu(self, cmd, cwd):
+    def launch_gemu(self, params_string):
         try:
-            self.cmd = cmd
-            self.cwd = cwd
+            self.params_string = params_string
             yield True
+        except Exception as e:
+            print("EXCEPTION", e)
+            raise e
         finally:
             return False
 
@@ -77,12 +78,6 @@ class GemuInstanceMock:
         self.typed_into_guest.append(command)
         self.sent_to_gemu.append(command)
 
-
-class MockDecorator(RunDecorator):
-    def _decorate(self):
-        return
-
-
 class TestGemuRunnerSingleFile:
 
     def get_mock_vm_config(self):
@@ -97,96 +92,115 @@ class TestGemuRunnerSingleFile:
         )
 
     def mock_gemu_instance(self):
-        return GemuInstanceMock(IMAGE_PATH)
+        return GemuInstanceMock()
 
-    def gemu_single_file_runner(self, gemu_instance, sample_path, export=None):
+    def gemu_single_file_runner(self, gemu_instance, recipe):
         vm_config = self.get_mock_vm_config()
         with patch('datetime.datetime') as mock_datetime:
             mock_now = mock_datetime.now.return_value
             mock_now.strftime.return_value = TIMESTAMP
-            return GemuRunner(sample_path, UNPACKING_TIME, RUNNAME, export, TRACKINGMODE, DOTNET, vm_config,
-                              gemu_instance, gemu_path=GEMU_PATH, sample_name=SAMPLE_NAME)
+            return GemuRunner(UNPACKING_TIME, TRACKINGMODE, DOTNET, vm_config, recipe, gemu_instance)
 
     def test_command_without_export(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, sample_path)
+        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
 
         gemu_runner.run_sample()
 
-        assert mock_gemu_instance.cmd == (f"{GEMU_PATH.as_posix()} -m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
                                           f"-loadvm {SNAPSHOT} -symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
                                           f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} "
-                                          f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} {IMAGE_PATH} "
-                                          f"> {sample_path}_{RUNNAME}_{TIMESTAMP}/runlog")
-        assert mock_gemu_instance.cwd == Path(f"{sample_path}_{RUNNAME}_{TIMESTAMP}")
+                                          f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} {IMAGE_PATH}")
         assert mock_gemu_instance.waited == UNPACKING_TIME
 
     def test_command_with_export(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, sample_path, export=EXPORT)
+        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME, export=EXPORT)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
 
+        gemu_runner.decorate_run([])
         gemu_runner.run_sample()
 
-        assert mock_gemu_instance.cmd == (f"{GEMU_PATH.as_posix()} -m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
                                           f"-loadvm {SNAPSHOT} -symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
                                           f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} "
-                                          f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} {IMAGE_PATH} "
-                                          f"> {sample_path}_EXPORT:{EXPORT}_{RUNNAME}_{TIMESTAMP}/runlog")
-        assert mock_gemu_instance.cwd == Path(f"{sample_path}_EXPORT:{EXPORT}_{RUNNAME}_{TIMESTAMP}")
+                                          f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} {IMAGE_PATH}")
 
     def test_with_one_decorator(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, sample_path)
-        gemu_runner.decorate_run([(MockDecorator(2, gemu_runner))])
+        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
+        mock_decorator = Mock()
 
-        ret = gemu_runner.run_sample()
+        gemu_runner.decorate_run([mock_decorator])
+        gemu_runner.run_sample()
 
-        assert ret == "normal"
+        mock_decorator.start.assert_called_once()
+        mock_decorator.stop.assert_called_once()
+        mock_decorator.join.assert_called_once()
 
     def test_with_multiple_decorators(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, sample_path)
-        gemu_runner.decorate_run([MockDecorator(2, gemu_runner), MockDecorator(2, gemu_runner)])
+        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
+        mock_decorators = [Mock(), Mock()]
 
-        ret = gemu_runner.run_sample()
+        gemu_runner.decorate_run(mock_decorators)
+        gemu_runner.run_sample()
 
-        assert ret == "normal"
+        for mock_decorator in mock_decorators:
+            mock_decorator.start.assert_called_once()
+            mock_decorator.stop.assert_called_once()
+            mock_decorator.join.assert_called_once()
 
     def test_correct_messages_are_sent_to_gemu(self, tmpdir):
+        tmpdir = Path(tmpdir)
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
-        sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
+        sample_path = tmpdir / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, sample_path)
-        gemu_runner.decorate_run([MockDecorator(2, gemu_runner), MockDecorator(2, gemu_runner)])
+        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
 
         gemu_runner.run_sample()
 
-        expected = [f'change ide1-cd0 {tmpdir}/{SMALL_BITNESS_PE}.iso\n', 'sendkey esc\n',
-                    f' copy D:\\{SAMPLE_NAME} C:\\Users\\analyst\\Desktop\\{SAMPLE_NAME}\n',
-                    'gemurec\n', f'start C:\\Users\\analyst\\Desktop\\{SAMPLE_NAME}\n']
+        expected = [
+            f'change ide1-cd0 {tmpdir}/{tmpdir.name}.iso\n', 'sendkey esc\n',
+            f'copy D:\\{SMALL_BITNESS_PE.name} {USER}\\Desktop\\{recipe.sample_name}\n',
+            'gemurec\n',
+            *[cmd+"\n" for cmd in recipe.commands],
+        ]
         self.assert_messages_to_gemu(expected, mock_gemu_instance.sent_to_gemu)
 
-    def test_correct_messages_are_sent_to_gemu_with_export(self, tmpdir):
+    def test_correct_messages_are_sent_to_gemu_multiple_commands(self, tmpdir):
+        tmpdir = Path(tmpdir)
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
-        sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
+        sample_path = tmpdir / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, sample_path, export=EXPORT)
-        gemu_runner.decorate_run([MockDecorator(2, gemu_runner), MockDecorator(2, gemu_runner)])
 
+        recipe_file = {"samples": [f"{SMALL_BITNESS_PE.as_posix()}:test2", f"{BIG_BITNESS_PE.as_posix()}:test4"], "cmds": ["echo hey", "echo ho"]}
+        recipe_file_name = Path(tmpdir) / "test.yml"
+        with open(recipe_file_name, "w") as f:
+            yaml.dump(recipe_file, f)
+        recipe = Recipe(USER, sample_path.as_posix(), recipe=recipe_file_name)
+        
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
         gemu_runner.run_sample()
 
-        expected = [f'change ide1-cd0 {tmpdir}/{SMALL_BITNESS_PE}.iso\n', 'sendkey esc\n',
-                    f' copy C:\\Windows\\SysWOW64\\rundll32.exe C:\\Users\\analyst\\Desktop\\{SAMPLE_NAME}\n',
-                    f' copy D:\\{SAMPLE_NAME} C:\\Users\\analyst\\Desktop\\ahsofidll.dll\n',
-                    'gemurec\n', f'start C:\\Users\\analyst\\Desktop\\{SAMPLE_NAME} ahsofidll.dll,export1\n']
+        expected = [
+            f'change ide1-cd0 {tmpdir}/{tmpdir.name}.iso\n', 'sendkey esc\n',
+            *[f'copy D:\\{mount[0].name} {mount[1]}\n' for mount in recipe.mountings],
+            'gemurec\n',
+            *[cmd+"\n" for cmd in recipe.commands],
+        ]
         self.assert_messages_to_gemu(expected, mock_gemu_instance.sent_to_gemu)
 
     def assert_messages_to_gemu(self, expected, actual):
