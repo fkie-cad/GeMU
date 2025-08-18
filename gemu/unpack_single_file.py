@@ -27,10 +27,12 @@ if __name__ == "__main__":
     parser.add_argument("--yararules", help="Give binary with compiles rules to exit early if the yara rules match", type=str, default=None)
     parser.add_argument("--dotnet", help="dotnet tracking mode", metavar="on|off|auto", type=str)
     parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar= "syscall|basicblock|both", type=str)
+    parser.add_argument("--recipe", help="Force GeMU to run a specific recipe by providing the PATH to the recipe", type=Path, default=None)
     args = parser.parse_args()
     vm_config = get_vm_settings(args.config)
     sample_path = Path(os.path.abspath(args.sample))
-    recipe = Recipe(vm_config.user, sample_path.as_posix(), args.export or "")
+    recipe = Recipe(user=vm_config.user, input_binary=sample_path.as_posix(),
+                    export=args.export or "", recipe=args.recipe)
     analysis_folder = AnalysisFolder(args.runname, sample_path)
     gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
     runner = GemuRunner(recording_time=args.time, trackingmode=args.trackingmode,

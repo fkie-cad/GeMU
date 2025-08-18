@@ -8,8 +8,8 @@ from gemuinteractor.config_parser import SAMPLE_NAME
 RECIPE_FOLDER = Path(__file__).parent / "recipes"
 
 class Recipe:
-    def __init__(self, user: str, input_binary: str, export: str = "",  default_sample_name: str = SAMPLE_NAME):
-        self._recipe_dict = self._get_recipe_dict(input_binary, export)
+    def __init__(self, user: str, input_binary: str, export: str = "", recipe: Path = None,  default_sample_name: str = SAMPLE_NAME):
+        self._recipe_dict = self.parse_yaml(recipe) if recipe else self._get_recipe_dict(input_binary, export)
         self.sample_name: str = self._recipe_dict.get("overwriteinitprocess", default_sample_name)
         self._replacements = {
             "$USER": user,

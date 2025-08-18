@@ -1,12 +1,11 @@
+import subprocess
 import time
 from itertools import product
 from pathlib import Path
+
 import pytest
-import subprocess
 
-from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.config_parser import get_vm_settings
-
 from generate_shellcode import generate_shellcode_main
 
 compilers = {32: "i686-w64-mingw32-gcc", 64: "x86_64-w64-mingw32-gcc"}

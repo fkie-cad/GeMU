@@ -10,18 +10,18 @@ from contextlib import contextmanager
 from pathlib import Path
 
 class AnalysisFolder:
-    def __init__(self, runname, path):
-        self.analysis_folder = self._build_analysis_folder(runname, path)
+    def __init__(self, runname, input_binary):
+        self.analysis_folder = self._build_analysis_folder(runname, input_binary)
         self.runlog = self.analysis_folder / "runlog"
         self.dumps_folder = self.analysis_folder / "dumps"
         self.dumps_zip = self.analysis_folder / "dumps.zip"
 
-    def _build_analysis_folder(self, runname, sample_path) -> Path:
+    def _build_analysis_folder(self, runname, input_binary) -> Path:
         analysis_folder = Path(
-            f"{sample_path.as_posix()}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+            f"{input_binary.as_posix()}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
         )
         analysis_folder.mkdir(exist_ok=True)
-        os.symlink(sample_path, f"{analysis_folder}/sample")
+        os.symlink(input_binary, f"{analysis_folder}/sample")
         return analysis_folder
 
     def zip_dumps_folder(self):
@@ -123,7 +123,6 @@ class GemuInstance:
             print("timeout expired.. shutting down")
             self.return_status = "timeout"
 
-
     def get_return_code(self):
         return self.process.returncode
 
@@ -166,9 +165,11 @@ class GemuInstance:
 def build_iso_from_files(samples: set[Path], tmpdir):
     tmpdir = Path(tmpdir)
     for sample in samples:
+        if " " in sample.name:
+            raise RuntimeError(f"Sample {sample.name} contains spaces. This is not supported.")
         tmp_sample = tmpdir / sample.name
         shutil.copy(sample.absolute(), tmp_sample)
-    temp_iso = tmpdir / Path(tmpdir.as_posix().replace(" ", "") + ".iso")
+    temp_iso = tmpdir / (tmpdir.name + ".iso")
     subprocess.check_call([
         "/usr/bin/genisoimage",
         "-quiet",
@@ -179,6 +180,6 @@ def build_iso_from_files(samples: set[Path], tmpdir):
         "-J",
         "-o",
         temp_iso.as_posix(),
-        tmpdir.as_posix(),
+        tmpdir.as_posix()
     ])
     return temp_iso

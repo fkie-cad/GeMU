@@ -23,7 +23,7 @@ ADDITIONAL_PARAMETERS = [
     "-addparameter",
     "IAmATest",
 ]
-USER = "C:\\Users\\analyst\\"
+USER = "C:\\Users\\testuser"
 SYMBOLMAPPING = Path("/path/to/symbolmapping")
 APIDOC = Path("/path/to/apidoc")
 SYSCALLTABLE = Path("/path/to/syscalltable")
@@ -36,7 +36,7 @@ TEST_CONFIG = {
     "VM_IMAGE_PATH": IMAGE_PATH,
     "SNAPSHOT": SNAPSHOT,
     "RAM": RAM_SIZE,
-    "USER": "C:\\Users\\analyst\\",
+    "USER": "C:\\Users\\testuser",
     "SYMBOLMAPPING": SYMBOLMAPPING.as_posix(),
     "APIDOC": APIDOC.as_posix(),
     "SYSCALLTABLE": SYSCALLTABLE.as_posix(),
