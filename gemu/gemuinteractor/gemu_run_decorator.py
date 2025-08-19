@@ -44,6 +44,7 @@ class YaraEarlyExiter(RunDecorator):
     def _init_scanner(self):
         import yara
         print("getting rules")
+        #print("ruuuuule", Path(self.yara_rules).read_text())
         self.rules = yara.load(self.yara_rules)
         self.checked_files = set()
         self.dump_folder = self._gemu_instance.analysis_folder.dumps_folder
@@ -52,6 +53,7 @@ class YaraEarlyExiter(RunDecorator):
         if not self.dump_folder.exists():
             return
         for i in self.dump_folder.iterdir():
+            print("checking")
             if i.as_posix() in self.checked_files:
                 continue
             print(f"checking file {i.as_posix()}")
