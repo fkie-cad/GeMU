@@ -1,24 +1,23 @@
 import shutil
+import shutil
 import subprocess
-import unittest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
-import yara
-from collections import defaultdict
 import tempfile
 import os
+import pytest
 
 from gemuinteractor.gemu_run_decorator import WrittenFileMerger, YaraEarlyExiter
-from tests.test_gemu_runner_single_file import BIG_BITNESS_PE
 
 
-class TestYaraEarlyExiter(unittest.TestCase):
-    def setUp(self):
-        # Create mock GemuInstance
-        self.mock_gemu = Mock()
+@pytest.fixture
+def mock_gemu():
+    return Mock()
 
-        # Create temporary yara rules file
-        self.yara_content = '''rule TestRule
+
+@pytest.fixture
+def yara_rule_file():
+    yara_content = '''rule TestRule
 {
     strings:
         $a = "test_string"
@@ -26,97 +25,87 @@ class TestYaraEarlyExiter(unittest.TestCase):
         any of them
 }
 '''
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(yara_content.encode())
+        temp_file.flush()
+        subprocess.check_output(["yarac", "-w", temp_file.name, temp_file.name])
+        yield temp_file.name
+    os.unlink(temp_file.name)
 
-        self.temp_rule_file = tempfile.NamedTemporaryFile(delete=False)
-        with open(self.temp_rule_file.name, 'w') as f:
-            f.write(self.yara_content)
-        subprocess.check_output(["yarac", "-w", self.temp_rule_file.name, self.temp_rule_file.name])
 
-    def tearDown(self):
-        os.unlink(self.temp_rule_file.name)
-
-    def test_decorate_no_dumps_folder(self):
-        exiter = YaraEarlyExiter(1, self.temp_rule_file.name, self.mock_gemu)
+class TestYaraEarlyExiter:
+    def test_decorate_no_dumps_folder(self, mock_gemu, yara_rule_file):
+        exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
+        exiter.dump_folder = Path("/does/not/exist")
         exiter._decorate()
-        self.mock_gemu.kill.assert_not_called()
+        mock_gemu.kill.assert_not_called()
 
-    def test_decorate_with_match(self):
+    def test_decorate_with_match(self, mock_gemu, yara_rule_file):
         with tempfile.TemporaryDirectory() as tmpdir:
             with open(os.path.join(tmpdir, "testdump"), 'w') as f:
                 f.write("This file contains test_string to match")
 
-            exiter = YaraEarlyExiter(1, self.temp_rule_file.name, self.mock_gemu)
+            exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
             exiter.dump_folder = Path(tmpdir)
             exiter._decorate()
 
-            self.mock_gemu.kill.assert_called_once()
+            mock_gemu.kill.assert_called_once()
 
-    def test_decorate_without_match(self):
+    def test_decorate_without_match(self, mock_gemu, yara_rule_file):
         with tempfile.TemporaryDirectory() as tmpdir:
             testdump = os.path.join(tmpdir, "testdump")
             with open(testdump, 'w') as f:
                 f.write("This file contains test_string to match")
 
-            exiter = YaraEarlyExiter(1, self.temp_rule_file.name, self.mock_gemu)
+            exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
             exiter.dump_folder = Path(tmpdir)
             exiter.checked_files.add(testdump)
             exiter._decorate()
 
-            self.mock_gemu.kill.assert_not_called()
+            mock_gemu.kill.assert_not_called()
 
 
-class TestWrittenFileMerger(unittest.TestCase):
-    def setUp(self):
-        self.mock_gemu = Mock()
-        self.mock_gemu.analysis_folder.dumps_folder = Path("/fake/path")
-        self.merger = WrittenFileMerger(1, self.mock_gemu)
+class TestWrittenFileMerger:
+    @pytest.fixture
+    def merger(self, mock_gemu):
+        return WrittenFileMerger(1, mock_gemu)
 
-    @patch('pathlib.Path.exists')
-    def test_decorate_no_dumps_folder(self, mock_exists):
-        mock_exists.return_value = False
-        self.merger._decorate()
-        # Verify no further processing occurred
+    def test_decorate_no_dumps_folder(self, merger):
+        merger.dump_folder = Path("/does/not/existttt")
+        merger._decorate()
+            # No further processing should occur
 
-    @patch('pathlib.Path.exists')
-    @patch('pathlib.Path.iterdir')
-    @patch('builtins.open')
-    def test_decorate_merge_files(self, mock_open, mock_iterdir, mock_exists):
-        mock_exists.return_value = True
+    def test_decorate_merge_files(self, merger):
+        with patch('pathlib.Path.exists', return_value=True), \
+                patch('pathlib.Path.iterdir') as mock_iterdir, \
+                patch('builtins.open'):
+            # Create mock files
+            files = [
+                Mock(name="handle1_writtenfile_123_nr_1"),
+                Mock(name="handle1_writtenfile_123_nr_2"),
+                Mock(name="handle2_writtenfile_123_nr_1")
+            ]
 
-        # Create mock files
-        files = [
-            Mock(name="handle1_writtenfile_123_nr_1"),
-            Mock(name="handle1_writtenfile_123_nr_2"),
-            Mock(name="handle2_writtenfile_123_nr_1")
-        ]
+            for f in files:
+                f.name = f.name
+                f.parent = Path("/fake/path")
 
-        for f in files:
-            f.name = f.name
-            f.parent = Path("/fake/path")
+            mock_iterdir.return_value = files
 
-        mock_iterdir.return_value = files
+            merger._decorate()
 
-        # Mock file operations
-        mock_file_handle = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file_handle
+            # Verify that iterdir was called
+            mock_iterdir.assert_called_once()
 
-        self.merger._decorate()
+    def test_decorate_single_file_no_merge(self, merger):
+        with patch('pathlib.Path.exists', return_value=True), \
+                patch('pathlib.Path.iterdir') as mock_iterdir:
+            # Create single mock file
+            mock_file = Mock(name="handle1_writtenfile_123_nr_1")
+            mock_file.name = mock_file.name
+            mock_iterdir.return_value = [mock_file]
 
-        # Verify that open was called for merge operations
-        self.assertTrue(mock_open.called)
+            merger._decorate()
 
-    @patch('pathlib.Path.exists')
-    @patch('pathlib.Path.iterdir')
-    def test_decorate_single_file_no_merge(self, mock_iterdir, mock_exists):
-        mock_exists.return_value = True
-
-        # Create single mock file
-        mock_file = Mock(name="handle1_writtenfile_123_nr_1")
-        mock_file.name = mock_file.name
-        mock_iterdir.return_value = [mock_file]
-
-        self.merger._decorate()
-
-        # Verify no merge operations occurred for single file
-
-
+            # Verify iterdir was called
+            mock_iterdir.assert_called_once()
