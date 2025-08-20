@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 class AnalysisFolder:
-    def __init__(self, runname, input_binary):
+    def __init__(self, runname, input_binary: Path):
         self.analysis_folder = self._build_analysis_folder(runname, input_binary)
         self.runlog = self.analysis_folder / "runlog"
         self.dumps_folder = self.analysis_folder / "dumps"

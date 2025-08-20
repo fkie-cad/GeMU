@@ -44,26 +44,28 @@ class YaraEarlyExiter(RunDecorator):
     def _init_scanner(self):
         import yara
         print("getting rules")
-        #print("ruuuuule", Path(self.yara_rules).read_text())
         self.rules = yara.load(self.yara_rules)
         self.checked_files = set()
         self.dump_folder = self._gemu_instance.analysis_folder.dumps_folder
+        self._yara_error = yara.Error
 
     def _decorate(self):
         if not self.dump_folder.exists():
             return
         for i in self.dump_folder.iterdir():
-            print("checking")
             if i.as_posix() in self.checked_files:
                 continue
             print(f"checking file {i.as_posix()}")
-            matches = self.rules.match(i.as_posix())
-            self.checked_files.add(i.as_posix())
-            if matches:
-                print(f"Found {[match.rule for match in matches]} in {i}")
-                print("Exiting early")
-                self._gemu_instance.kill(f"match({[match.rule for match in matches]},{i})")
-            return
+            try:
+                matches = self.rules.match(i.as_posix())
+                self.checked_files.add(i.as_posix())
+                if matches:
+                    print(f"Found {[match.rule for match in matches]} in {i}")
+                    print("Exiting early")
+                    self._gemu_instance.kill(f"match({[match.rule for match in matches]},{i})")
+                    return
+            except self._yara_error: #File might not be readable (because of WrittenFileMerger)
+                continue
     
 class WrittenFileMerger(RunDecorator):
     def _decorate(self):

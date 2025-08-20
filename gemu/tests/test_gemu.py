@@ -1,12 +1,15 @@
 import subprocess
-import time
 from itertools import product
 from pathlib import Path
 
 import pytest
 
-from gemuinteractor.config_parser import get_vm_settings
-from generate_shellcode import generate_shellcode_main
+from gemuinteractor.gemu_run_decorator import WrittenFileMerger, YaraEarlyExiter
+from gemuinteractor.helpers import AnalysisFolder, GemuInstance
+from gemuinteractor.recipe import Recipe
+from gemuinteractor.gemu_runner_single_file import GemuRunner
+from gemuinteractor.config_parser import GEMU_PATH, SAMPLE_NAME, get_vm_settings
+from tests.generate_shellcode import generate_shellcode_main
 
 compilers = {32: "i686-w64-mingw32-gcc", 64: "x86_64-w64-mingw32-gcc"}
 
@@ -76,8 +79,18 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness,trackingmod
 
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
     yararules = (TEST_FOLDER/"shellcode.yarc").as_posix()
-    runner = GemuRunnerSingleFile(sample_path, 120, RUNNAME, None, trackingmode, "off", get_vm_settings("win10"),,
-    status = runner.run_sample() 
-    assert status.split("(")[0] == "match"
-    time.sleep(3)
+    vm_config = get_vm_settings("win10")
+
+    recipe = Recipe(vm_config.user, sample_path, default_sample_name=SAMPLE_NAME)
+    analysis_folder = AnalysisFolder(RUNNAME, Path(sample_path))
+    gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
+    runner = GemuRunner(120, trackingmode, "off", vm_config, recipe, gemu_instance) 
+    decorators = [YaraEarlyExiter(2, yararules, gemu_instance), WrittenFileMerger(2, gemu_instance)]
+    
+    runner.decorate_run(decorators)
+
+    runner.run_sample()
+    status = analysis_folder.runlog.read_text().split("\n")[-3:-1]
+    assert "match" in status[0]
+    assert status[1] == "PROCESS RETURN CODE: 0"
     # assert not status.endswith("nr_0)")
