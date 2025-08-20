@@ -1,6 +1,8 @@
 import os
 import subprocess
 import tempfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -36,7 +38,9 @@ class TestYaraEarlyExiter:
     def test_decorate_no_dumps_folder(self, mock_gemu, yara_rule_file):
         exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
         exiter.dump_folder = Path("/does/not/exist")
-        exiter._decorate()
+        exiter.start()
+        exiter.stop()
+        exiter.join()
         mock_gemu.kill.assert_not_called()
 
     def test_decorate_with_match(self, tmpdir, mock_gemu, yara_rule_file):
@@ -45,7 +49,10 @@ class TestYaraEarlyExiter:
 
         exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
         exiter.dump_folder = Path(tmpdir)
-        exiter._decorate()
+
+        exiter.start()
+        exiter.stop()
+        exiter.join()
 
         mock_gemu.kill.assert_called_once()
 
@@ -57,7 +64,10 @@ class TestYaraEarlyExiter:
         exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
         exiter.dump_folder = Path(tmpdir)
         exiter.checked_files.add(testdump)
-        exiter._decorate()
+
+        exiter.start()
+        exiter.stop()
+        exiter.join()
 
         mock_gemu.kill.assert_not_called()
 
@@ -86,11 +96,38 @@ class TestWrittenFileMerger:
         file3.write_text("file3")
         expected_result = "file1file2"
 
-        merger._decorate()
+        merger.start()
+        merger.stop()
+        merger.join()
 
         assert result_file.exists()
         assert result_file.read_text() == expected_result
 
+    def test_decorate_expand_file(self, merger, tmpdir):
+        tmpdir = Path(tmpdir)
+        merger._gemu_instance.analysis_folder.dumps_folder = tmpdir
+
+        file1 = tmpdir/"handle1_1_writtenfile_123_nr_1"
+        file2 = tmpdir/"handle1_1_writtenfile_124_nr_2"
+        file3 = tmpdir/"handle2_3_writtenfile_125_nr_6"
+        file4 = tmpdir/"handle1_1_writtenfile_126_nr_7"
+        result_file = tmpdir/"handle1_1_writtenfilemerge_126_nr_7"
+
+        file1.write_text("file1")
+        file2.write_text("file2")
+        file3.write_text("file3")
+        expected_result = "file1file2file4"
+
+        merger.start()
+        time.sleep(2)
+
+        file4.write_text("file4")
+
+        merger.stop()
+        merger.join()
+
+        assert result_file.exists()
+        assert result_file.read_text() == expected_result
 
     def test_decorate_single_file_no_merge(self, merger, tmpdir):
         tmpdir = Path(tmpdir)
@@ -104,7 +141,9 @@ class TestWrittenFileMerger:
         file2.write_text("file2")
         file3.write_text("file3")
 
-        merger._decorate()
+        merger.start()
+        merger.stop()
+        merger.join()
 
         for f in tmpdir.iterdir():
             assert "writtenfilemerge" not in f.name

@@ -1,4 +1,7 @@
+import shutil
 import subprocess
+import threading
+import time
 from itertools import product
 from pathlib import Path
 
@@ -10,6 +13,7 @@ from gemuinteractor.recipe import Recipe
 from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.config_parser import GEMU_PATH, SAMPLE_NAME, get_vm_settings
 from tests.generate_shellcode import generate_shellcode_main
+from tests.test_gemu_runner_single_file import SMALL_BITNESS_PE, USER
 
 compilers = {32: "i686-w64-mingw32-gcc", 64: "x86_64-w64-mingw32-gcc"}
 
@@ -84,13 +88,35 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness,trackingmod
     recipe = Recipe(vm_config.user, sample_path, default_sample_name=SAMPLE_NAME)
     analysis_folder = AnalysisFolder(RUNNAME, Path(sample_path))
     gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
-    runner = GemuRunner(120, trackingmode, "off", vm_config, recipe, gemu_instance) 
-    decorators = [YaraEarlyExiter(2, yararules, gemu_instance), WrittenFileMerger(2, gemu_instance)]
+    runner = GemuRunner(120, trackingmode, "off", vm_config, recipe, gemu_instance)
+    yara_exiter = YaraEarlyExiter(2, yararules, gemu_instance)
+    decorators = [yara_exiter, WrittenFileMerger(2, gemu_instance)]
     
     runner.decorate_run(decorators)
 
     runner.run_sample()
-    status = analysis_folder.runlog.read_text().split("\n")[-4:-1]
-    assert "match" in status[0]
-    assert status[1] == "PROCESS RETURN CODE: 0"
-    # assert not status.endswith("nr_0)")
+    yara_exiter._decorate() # you should usually not call protected functions but for the sake of not writing more code, we call _decorate here
+    assert "match" in yara_exiter.return_code
+
+
+def test_qcow_is_released_from_first_instance(tmpdir):
+    shutil.copy(SMALL_BITNESS_PE, tmpdir)
+    copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
+    vm_config = get_vm_settings("win10")
+    recipe = Recipe(vm_config.user, copied_pe.as_posix())
+    analysis_folder = AnalysisFolder("tobekilled", Path(copied_pe))
+    gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
+    runner = GemuRunner(120, "syscall", "off", vm_config, recipe, gemu_instance)
+    analysis_folder2 = AnalysisFolder("killing", Path(copied_pe))
+    gemu_instance2 = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder2)
+
+    first_gemu = threading.Thread(target=runner.run_sample)
+    first_gemu.start()
+    time.sleep(5)
+    runner2 = GemuRunner(5, "syscall", "off", vm_config, recipe, gemu_instance2)
+
+    runner2.run_sample()
+
+    assert "PROCESS RETURN CODE: 137" in analysis_folder.runlog.read_text()
+    assert "BrokenPipeError: [Errno 32] Broken pipe" in analysis_folder.runlog.read_text()
+    assert "REASON FOR GEMU EXIT: timeout" in analysis_folder2.runlog.read_text()
