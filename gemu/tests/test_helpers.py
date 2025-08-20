@@ -86,10 +86,13 @@ def test_GemuInstance_normal(tmpdir):
 
     with instance.launch_gemu("hey ho"):
         instance.wait(1)
+    instance.log_return_status({"decorator": "return"})
 
     expected = """system_powerdown
 quit
-EXIT STATUS: normal
-PROCESS RETURN CODE: None"""
-    assert folder.runlog.read_text(), expected
+EXIT STATES OF DECORATORS: {"decorator": "return"}
+PROCESS RETURN CODE: None
+REASON FOR GEMU EXIT: timeout
+"""
+    assert expected in folder.runlog.read_text()
 

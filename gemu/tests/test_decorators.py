@@ -1,10 +1,9 @@
-import shutil
-import shutil
-import subprocess
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import tempfile
 import os
+import subprocess
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock
+
 import pytest
 
 from gemuinteractor.gemu_run_decorator import WrittenFileMerger, YaraEarlyExiter
@@ -69,45 +68,45 @@ class TestWrittenFileMerger:
         return WrittenFileMerger(1, mock_gemu)
 
     def test_decorate_no_dumps_folder(self, merger):
-        merger._gemu_instance.analysis_folder.dumps_folder = Path("/does/not/existttt")
+        merger._gemu_instance.analysis_folder.dumps_folder = Path("/does/not/exist")
         merger._decorate()
-            # No further processing should occur
+        # No further processing should occur
 
     def test_decorate_merge_files(self, merger, tmpdir):
-            tmpdir = Path(tmpdir)
-            merger._gemu_instance.analysis_folder.dumps_folder = tmpdir
+        tmpdir = Path(tmpdir)
+        merger._gemu_instance.analysis_folder.dumps_folder = tmpdir
 
-            file1 = tmpdir/"handle1_1_writtenfile_123_nr_1"
-            file2 = tmpdir/"handle1_1_writtenfile_124_nr_2"
-            file3 = tmpdir/"handle2_3_writtenfile_125_nr_6"
-            result_file = tmpdir/"handle1_1_writtenfilemerge_124_nr_2"
+        file1 = tmpdir/"handle1_1_writtenfile_123_nr_1"
+        file2 = tmpdir/"handle1_1_writtenfile_124_nr_2"
+        file3 = tmpdir/"handle2_3_writtenfile_125_nr_6"
+        result_file = tmpdir/"handle1_1_writtenfilemerge_124_nr_2"
 
-            file1.write_text("file1")
-            file2.write_text("file2")
-            file3.write_text("file3")
-            expected_result = "file1file2"
+        file1.write_text("file1")
+        file2.write_text("file2")
+        file3.write_text("file3")
+        expected_result = "file1file2"
 
-            merger._decorate()
+        merger._decorate()
 
-            assert result_file.exists()
-            assert result_file.read_text() == expected_result
+        assert result_file.exists()
+        assert result_file.read_text() == expected_result
 
 
     def test_decorate_single_file_no_merge(self, merger, tmpdir):
-            tmpdir = Path(tmpdir)
-            merger._gemu_instance.analysis_folder.dumps_folder = tmpdir
+        tmpdir = Path(tmpdir)
+        merger._gemu_instance.analysis_folder.dumps_folder = tmpdir
 
-            file1 = tmpdir/"handle1_1_writtenfile_123_nr_1"
-            file2 = tmpdir/"handle1_2_writtenfile_125_nr_6"
-            file3 = tmpdir/"handle2_1_writtenfile_125_nr_6"
+        file1 = tmpdir/"handle1_1_writtenfile_123_nr_1"
+        file2 = tmpdir/"handle1_2_writtenfile_125_nr_6"
+        file3 = tmpdir/"handle2_1_writtenfile_125_nr_6"
 
-            file1.write_text("file1")
-            file2.write_text("file2")
-            file3.write_text("file3")
+        file1.write_text("file1")
+        file2.write_text("file2")
+        file3.write_text("file3")
 
-            merger._decorate()
+        merger._decorate()
 
-            for f in tmpdir.iterdir():
-                assert "writtenfilemerge" not in f.name
+        for f in tmpdir.iterdir():
+            assert "writtenfilemerge" not in f.name
 
 

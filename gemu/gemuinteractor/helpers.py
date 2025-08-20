@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import shutil
 import string
@@ -37,6 +38,7 @@ class GemuInstance:
         self.analysis_folder = analysis_folder
         self.process = None
         self._lock = Lock()
+        self.reason_for_gemu_end = "normal"
 
     def _launch(self, parameters):
         self._try_to_free_image()
@@ -47,7 +49,7 @@ class GemuInstance:
         )
         time.sleep(5)
 
-    def kill(self, reason: str = "unknown reason"):
+    def kill(self):
         if self._lock.acquire_lock(blocking=False): #only first kill will be executed and logged
             try:
                 self.write_to_qemu_console(b"system_powerdown\n")
@@ -59,12 +61,12 @@ class GemuInstance:
             except subprocess.TimeoutExpired:
                 pass
             self.process.kill()
-            self._log_return_status(reason, self.process.poll())
 
-    def _log_return_status(self, status, return_code):
+    def log_return_status(self, state):
         with open(self.analysis_folder.runlog, "a") as f:
-            f.write(f"EXIT STATUS: {str(status)}\n")
-            f.write(f"PROCESS RETURN CODE: {str(return_code)}\n")
+            f.write(f"EXIT STATES OF DECORATORS: {json.dumps(state)}\n")
+            f.write(f"PROCESS RETURN CODE: {str(self.process.poll())}\n")
+            f.write(f"REASON FOR GEMU EXIT: {self.reason_for_gemu_end}\n")
             
     def _try_to_free_image(self):
         lock_found, qemu_pid = self._check_qcow_lock()
@@ -104,9 +106,10 @@ class GemuInstance:
             self._launch(params_string)
             yield True
         except Exception as e:
-            self.kill(f"error({traceback.format_exc()})")
+            self.reason_for_gemu_end = f"error({traceback.format_exc()})"
+            self.kill()
         finally:
-            self.kill("normal")
+            self.kill()
 
     def write_to_qemu_console(self, command):
         self.process.stdin.write(command)
@@ -121,7 +124,7 @@ class GemuInstance:
             print("sleep over.. shutting down")
         except subprocess.TimeoutExpired:
             print("timeout expired.. shutting down")
-            self.return_status = "timeout"
+            self.reason_for_gemu_end = "timeout"
 
     def get_return_code(self):
         return self.process.returncode

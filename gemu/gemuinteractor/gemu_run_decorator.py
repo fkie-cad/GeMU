@@ -13,6 +13,7 @@ class RunDecorator:
         self._gemu_instance = gemu_instance
         self._stop_decorator = False
         self._thread = None
+        self.return_code = ""
 
     def _run(self):
         while True:
@@ -62,7 +63,8 @@ class YaraEarlyExiter(RunDecorator):
                 if matches:
                     print(f"Found {[match.rule for match in matches]} in {i}")
                     print("Exiting early")
-                    self._gemu_instance.kill(f"match({[match.rule for match in matches]},{i})")
+                    self.return_code = f"match({[match.rule for match in matches]},{i})"
+                    self._gemu_instance.kill()
                     return
             except self._yara_error: #File might not be readable (because of WrittenFileMerger)
                 continue

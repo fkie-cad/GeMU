@@ -68,6 +68,9 @@ class GemuInstanceMock:
         self.written_to_qemu_console.append(command)
         self.sent_to_gemu.append(command.decode())
 
+    def log_return_status(self, states):
+        self.states = states
+
     def wait(self, timeout):
         self.waited = timeout
 
@@ -138,6 +141,7 @@ class TestGemuRunnerSingleFile:
         recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
         mock_decorator = Mock()
+        mock_decorator.return_code = "return1"
 
         gemu_runner.decorate_run([mock_decorator])
         gemu_runner.run_sample()
@@ -145,6 +149,7 @@ class TestGemuRunnerSingleFile:
         mock_decorator.start.assert_called_once()
         mock_decorator.stop.assert_called_once()
         mock_decorator.join.assert_called_once()
+        assert mock_gemu_instance.states == {"Mock" :"return1"}
 
     def test_with_multiple_decorators(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
@@ -152,7 +157,11 @@ class TestGemuRunnerSingleFile:
         mock_gemu_instance = self.mock_gemu_instance()
         recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
-        mock_decorators = [Mock(), Mock()]
+        mock1 = Mock()
+        mock1.return_code = "return1"
+        mock2 = Mock()
+        mock2.return_code = "return2"
+        mock_decorators = [mock1, mock2]
 
         gemu_runner.decorate_run(mock_decorators)
         gemu_runner.run_sample()
@@ -161,6 +170,7 @@ class TestGemuRunnerSingleFile:
             mock_decorator.start.assert_called_once()
             mock_decorator.stop.assert_called_once()
             mock_decorator.join.assert_called_once()
+        assert mock_gemu_instance.states == {"Mock" :"return2"}
 
     def test_correct_messages_are_sent_to_gemu(self, tmpdir):
         tmpdir = Path(tmpdir)

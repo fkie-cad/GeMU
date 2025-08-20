@@ -90,7 +90,7 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness,trackingmod
     runner.decorate_run(decorators)
 
     runner.run_sample()
-    status = analysis_folder.runlog.read_text().split("\n")[-3:-1]
+    status = analysis_folder.runlog.read_text().split("\n")[-4:-1]
     assert "match" in status[0]
     assert status[1] == "PROCESS RETURN CODE: 0"
     # assert not status.endswith("nr_0)")

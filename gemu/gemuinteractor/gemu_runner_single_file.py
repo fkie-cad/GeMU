@@ -65,10 +65,13 @@ class GemuRunner:
             decorator.start()
 
     def _join_decorators(self):
+        return_states = dict()
         for decorator in self._decorators:
             decorator.stop()
         for decorator in self._decorators:
             decorator.join()
+            return_states[type(decorator).__name__] = decorator.return_code
+        return return_states
 
     def run_sample(self):
         self._start_decorators()
@@ -77,4 +80,4 @@ class GemuRunner:
             with self._mount_samples():
                 self._launch_commands()
                 self.gemu_instance.wait(timeout=self.recording_time)
-        self._join_decorators()
+        self.gemu_instance.log_return_status(self._join_decorators())
