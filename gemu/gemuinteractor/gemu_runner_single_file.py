@@ -68,8 +68,6 @@ class GemuRunner:
         return_states = dict()
         for decorator in self._decorators:
             decorator.stop()
-        for decorator in self._decorators:
-            decorator.join()
             return_states[type(decorator).__name__] = decorator.return_code
         return return_states
 

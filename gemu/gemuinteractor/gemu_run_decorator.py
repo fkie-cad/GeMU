@@ -25,8 +25,6 @@ class RunDecorator:
 
     def stop(self):
         self._stop_decorator = True
-
-    def join(self):
         self._thread.join()
 
     def start(self):
@@ -37,7 +35,7 @@ class RunDecorator:
         raise NotImplementedError
 
 class YaraEarlyExiter(RunDecorator):
-    def __init__(self, sleep, yara_rules, gemu_instance: GemuInstance):
+    def __init__(self, sleep, yara_rules:str, gemu_instance: GemuInstance):
         super().__init__(sleep, gemu_instance)
         self.yara_rules = yara_rules
         self._init_scanner()

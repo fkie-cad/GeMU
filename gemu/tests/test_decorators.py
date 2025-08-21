@@ -40,7 +40,6 @@ class TestYaraEarlyExiter:
         exiter.dump_folder = Path("/does/not/exist")
         exiter.start()
         exiter.stop()
-        exiter.join()
         mock_gemu.kill.assert_not_called()
 
     def test_decorate_with_match(self, tmpdir, mock_gemu, yara_rule_file):
@@ -52,7 +51,6 @@ class TestYaraEarlyExiter:
 
         exiter.start()
         exiter.stop()
-        exiter.join()
 
         mock_gemu.kill.assert_called_once()
 
@@ -67,7 +65,6 @@ class TestYaraEarlyExiter:
 
         exiter.start()
         exiter.stop()
-        exiter.join()
 
         mock_gemu.kill.assert_not_called()
 
@@ -98,7 +95,6 @@ class TestWrittenFileMerger:
 
         merger.start()
         merger.stop()
-        merger.join()
 
         assert result_file.exists()
         assert result_file.read_text() == expected_result
@@ -124,7 +120,6 @@ class TestWrittenFileMerger:
         file4.write_text("file4")
 
         merger.stop()
-        merger.join()
 
         assert result_file.exists()
         assert result_file.read_text() == expected_result
@@ -143,7 +138,6 @@ class TestWrittenFileMerger:
 
         merger.start()
         merger.stop()
-        merger.join()
 
         for f in tmpdir.iterdir():
             assert "writtenfilemerge" not in f.name

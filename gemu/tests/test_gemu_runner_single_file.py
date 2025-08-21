@@ -148,7 +148,6 @@ class TestGemuRunnerSingleFile:
 
         mock_decorator.start.assert_called_once()
         mock_decorator.stop.assert_called_once()
-        mock_decorator.join.assert_called_once()
         assert mock_gemu_instance.states == {"Mock" :"return1"}
 
     def test_with_multiple_decorators(self, tmpdir):
@@ -169,7 +168,6 @@ class TestGemuRunnerSingleFile:
         for mock_decorator in mock_decorators:
             mock_decorator.start.assert_called_once()
             mock_decorator.stop.assert_called_once()
-            mock_decorator.join.assert_called_once()
         assert mock_gemu_instance.states == {"Mock" :"return2"}
 
     def test_correct_messages_are_sent_to_gemu(self, tmpdir):

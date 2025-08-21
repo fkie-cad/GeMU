@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from gemu.unpack_single_file import unpack_single_file
 from gemuinteractor.gemu_run_decorator import WrittenFileMerger, YaraEarlyExiter
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
 from gemuinteractor.recipe import Recipe
@@ -34,7 +35,7 @@ def compiled_tests_folder(tmp_path_factory):
     return output_path
 
 
-def compile_test(compiled_tests_folder, test_name, bitness):
+def compile_test(compiled_tests_folder: Path, test_name: str, bitness) -> str:
     output_name = f"{test_name}_{bitness}.exe"
     output_path = (compiled_tests_folder / output_name).as_posix()
     compile(f"{test_name}.c", output_path, bitness, cwd=TEST_FOLDER.as_posix())
@@ -76,27 +77,26 @@ SHELLCODE_TEST_NAMES = (
 
 
 @pytest.mark.parametrize("test_name,bitness,trackingmode", product(SHELLCODE_TEST_NAMES, (32,64), ("syscall", "basicblock")))
-def test_shellcode_payload(compiled_tests_folder, test_name, bitness,trackingmode):
+def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmode):
 
     if trackingmode == "basicblock" and test_name == "writefile":
         pytest.skip(reason="known issue with bb tracking")
 
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
-    yararules = (TEST_FOLDER/"shellcode.yarc").as_posix()
-    vm_config = get_vm_settings("win10")
+    yararules = (TEST_FOLDER/"shellcode.yarc")
 
-    recipe = Recipe(vm_config.user, sample_path, default_sample_name=SAMPLE_NAME)
-    analysis_folder = AnalysisFolder(RUNNAME, Path(sample_path))
-    gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
-    runner = GemuRunner(120, trackingmode, "off", vm_config, recipe, gemu_instance)
-    yara_exiter = YaraEarlyExiter(2, yararules, gemu_instance)
-    decorators = [yara_exiter, WrittenFileMerger(2, gemu_instance)]
+    analysis_folder = unpack_single_file(
+        sample=Path(sample_path),
+        config="win10",
+        time=120,
+        runname=f"gemutest-{trackingmode}",
+        yararules=yararules,
+        trackingmode=trackingmode,
+        dotnet="off"
+    )
+    assert "match" in analysis_folder.runlog.read_text().split("\n")[-4]
     
-    runner.decorate_run(decorators)
-
-    runner.run_sample()
-    yara_exiter._decorate() # you should usually not call protected functions but for the sake of not writing more code, we call _decorate here
-    assert "match" in yara_exiter.return_code
+    assert not analysis_folder.dumps_folder.exists()
 
 
 def test_qcow_is_released_from_first_instance(tmpdir):

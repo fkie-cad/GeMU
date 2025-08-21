@@ -1,5 +1,4 @@
 import argparse
-import os
 from pathlib import Path
 
 from gemuinteractor.config_parser import get_vm_settings, GEMU_PATH
@@ -8,38 +7,89 @@ from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
 from gemuinteractor.recipe import Recipe
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--sample",
-        help="The sample to executed",
-        required=True
-    )
-    parser.add_argument(
-        "--time",
-        help="The number of seconds to record an execution",
-        type=int,
-        default=30,
-    )
-    parser.add_argument("--config", help="Give the config to the virtual machine", default="win10")
-    parser.add_argument("--runname", help="Name of the run", type=str, default="gemu")
-    parser.add_argument("--export", help="Give the export of the PE file that shall be launched", type=str, default=None)
-    parser.add_argument("--yararules", help="Give binary with compiles rules to exit early if the yara rules match", type=str, default=None)
-    parser.add_argument("--dotnet", help="dotnet tracking mode", metavar="on|off|auto", type=str)
-    parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar= "syscall|basicblock|both", type=str)
-    parser.add_argument("--recipe", help="Force GeMU to run a specific recipe by providing the PATH to the recipe", type=Path, default=None)
-    args = parser.parse_args()
-    vm_config = get_vm_settings(args.config)
-    sample_path = Path(os.path.abspath(args.sample))
-    recipe = Recipe(user=vm_config.user, input_binary=sample_path.as_posix(),
-                    export=args.export or "", recipe=args.recipe)
-    analysis_folder = AnalysisFolder(args.runname, sample_path)
+def unpack_single_file(
+    sample: Path,
+    config: str,
+    time: int,
+    runname: str,
+    export: str|None = None,
+    yararules: Path|None = None,
+    dotnet: str|None = None,
+    trackingmode: str|None = None,
+    recipe: Path|None = None
+) -> AnalysisFolder:
+    """Main execution function for GEMU analysis.
+    
+    Args:
+        sample: Path to the sample to be executed
+        config: VM configuration name
+        time: Recording time in seconds
+        runname: Name of the analysis run
+        export: PE file export to launch
+        yararules: Path to compiled YARA rules for early exit
+        dotnet: .NET tracking mode (on|off|auto)
+        trackingmode: WinAPI tracking mode (syscall|basicblock|both)
+        recipe: Path to specific recipe file
+    """
+    vm_config = get_vm_settings(config)
+    
+    recipe_obj = Recipe(user=vm_config.user, input_binary=sample.as_posix(), export=export or "", recipe=recipe)
+    analysis_folder = AnalysisFolder(runname, sample)
     gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
-    runner = GemuRunner(recording_time=args.time, trackingmode=args.trackingmode,
-                        dotnet=args.dotnet, vm_config=vm_config, gemu_instance=gemu_instance, recipe=recipe)
+    
+    runner = GemuRunner(
+        recording_time=time,
+        trackingmode=trackingmode,
+        dotnet=dotnet,
+        vm_config=vm_config,
+        gemu_instance=gemu_instance,
+        recipe=recipe_obj
+    )
+    
     decorators: list[RunDecorator] = [WrittenFileMerger(sleep=2, gemu_instance=gemu_instance)]
-    if args.yararules:
-        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=args.yararules, gemu_instance=gemu_instance))
+    if yararules:
+        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=yararules.as_posix(), gemu_instance=gemu_instance))
     runner.decorate_run(decorators)
+
     runner.run_sample()
     analysis_folder.zip_dumps_folder()
+    return analysis_folder
+
+def existing_path(path_str: str) -> Path:
+    path = Path(path_str).expanduser().absolute()
+    if not path.exists():
+        raise FileNotFoundError()
+    return path
+
+def cli_main() -> None:
+    """CLI entry point that handles argument parsing."""
+    parser = argparse.ArgumentParser(description="GEMU malware analysis tool")
+    
+    parser.add_argument("--sample", help="The sample to be executed", required=True, type=existing_path)
+    parser.add_argument("--time", help="Number of seconds to record execution", type=int, default=30)
+    parser.add_argument("--config", help="VM configuration name", default="win10")
+    parser.add_argument("--runname", help="Name of the analysis run", default="gemu")
+    parser.add_argument("--export", help="PE file export to launch", default=None)
+    parser.add_argument("--yararules", help="Path to compiled YARA rules for early exit", type=existing_path, default=None)
+    parser.add_argument("--dotnet", help=".NET tracking mode", metavar="on|off|auto")
+    parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar="syscall|basicblock|both")
+    parser.add_argument("--recipe", help="Path to specific recipe file", type=existing_path, default=None)
+    
+    
+    args = parser.parse_args()
+    
+    unpack_single_file(
+        sample=args.sample,
+        config=args.config,
+        time=args.time,
+        runname=args.runname,
+        export=args.export,
+        yararules=args.yararules,
+        dotnet=args.dotnet,
+        trackingmode=args.trackingmode,
+        recipe=args.recipe
+    )
+
+
+if __name__ == "__main__":
+    cli_main()
