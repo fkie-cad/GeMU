@@ -16,7 +16,8 @@ def unpack_single_file(
     yararules: Path|str|None = None,
     dotnet: str|None = None,
     trackingmode: str|None = None,
-    recipe: Path|str|None = None
+    recipe: Path|str|None = None,
+    tracing: bool = False
 ) -> AnalysisFolder:
     """Main execution function for GEMU analysis.
     
@@ -43,7 +44,8 @@ def unpack_single_file(
         dotnet=dotnet,
         vm_config=vm_config,
         gemu_instance=gemu_instance,
-        recipe=recipe_obj
+        recipe=recipe_obj,
+        tracing=tracing
     )
     
     decorators: list[RunDecorator] = [WrittenFileMerger(sleep=2, gemu_instance=gemu_instance)]
@@ -79,7 +81,8 @@ def cli_main() -> None:
     parser.add_argument("--dotnet", help=".NET tracking mode", metavar="on|off|auto")
     parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar="syscall|basicblock|both")
     parser.add_argument("--recipe", help="Path to specific recipe file", type=optional_existing_path, default=None)
-    
+    parser.add_argument("--tracing", help="Activate BasicBlock tracing in GeMU", action="store_true")
+
     
     args = parser.parse_args()
     
@@ -92,7 +95,8 @@ def cli_main() -> None:
         yararules=args.yararules,
         dotnet=args.dotnet,
         trackingmode=args.trackingmode,
-        recipe=args.recipe
+        recipe=args.recipe,
+        tracing=args.tracing
     )
 
 

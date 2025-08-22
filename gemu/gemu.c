@@ -945,11 +945,13 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
 
 
     QWORD pid, tid;
-    get_current_pid_and_tid(cpu, &pid, &tid);
-    syscall_hook_t* newHook_ptr = g_hash_table_lookup(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid));
+    get_current_pid_and_tid(cpu, &pid, &tid, process);
+    WinThread* current_thread = get_win_thread(process, tid);
+    syscall_hook_t* newHook_ptr = current_thread->syscall_return_hook;
     if(newHook_ptr == NULL){
         newHook_ptr = malloc(sizeof(syscall_hook_t));
-        g_hash_table_insert(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid), newHook_ptr);
+        current_thread->syscall_return_hook = newHook_ptr;
+        //g_hash_table_insert(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid), newHook_ptr);
     }
     newHook_ptr->active = true;
     newHook_ptr->out_parameter_list.number_of_outparameters = -2;

@@ -14,6 +14,8 @@
 
 struct timespec *start_time = NULL;
 
+target_ulong csbasecache = 0;
+
 static bool WinProcess_cmp(const void *a, const void *b) {
   WinProcess *wa = (WinProcess *)a;
   WinProcess *wb = (WinProcess *)b;
@@ -186,13 +188,32 @@ void print_memory_map(CPUState *cpu, WinProcess *process) {
   process->new_sections = latest_sections;
 }
 
-void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid) {
+void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid, WinProcess *process) {
   TEB64 teb;
   CPUX86State *env = cpu->env_ptr;
-  SegmentCache gs = env->segs[R_GS];
-  gemu_virtual_memory_rw(cpu, gs.base, (uint8_t *)&teb, sizeof teb, false);
+  if (env->segs[R_GS].base != 0) {
+      process->gsbase = env->segs[R_GS].base;
+  }
+  //gemu_virtual_memory_rw(cpu, gs.base, (uint8_t *)&teb, sizeof teb, false);
+  gemu_virtual_memory_rw(cpu, process->gsbase, (uint8_t *)&teb, sizeof teb, false);
   *processid = teb.ClientId.ProcessId;
   *threadid = teb.ClientId.ThreadId;
+}
+
+WinThread *get_win_thread(WinProcess *process, QWORD tid) {
+    WinThread *thread = g_hash_table_lookup(process->threads_by_tid, GINT_TO_POINTER(tid));
+    if (!thread) {
+        thread = malloc(sizeof(WinThread));
+        if (!thread) {
+            // Whatever happens in this case
+            return NULL;
+        }
+        thread->syscall_return_hook = NULL;
+        thread->base_last_bb = 0;
+        thread->length_last_bb = 0;
+        g_hash_table_insert(process->threads_by_tid, GINT_TO_POINTER(tid), thread);
+    }
+    return thread;
 }
 
 WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu,
@@ -242,7 +263,8 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
       .cache_section_written = NULL,
       .current_modules = NULL,
       .bitness = BITNESS_UNKNOWN,
-      .syscall_return_hooks_by_tid = g_hash_table_new(NULL, NULL)
+      .threads_by_tid = g_hash_table_new(NULL, NULL),
+      .gsbase = 0
   };
   newThread.is_excluded = is_process_excluded(w, &newThread);
   *newThreadPtr = newThread;

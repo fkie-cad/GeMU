@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 import threading
 import time
 from collections import defaultdict
@@ -55,6 +56,7 @@ class YaraEarlyExiter(RunDecorator):
                 continue
             print(f"checking file {dump}")
             try:
+                subprocess.check_output(f"sync '{str(dump)}'", shell=True)
                 matches = self.rules.match(str(dump))
                 self.checked_files.add(dump)
                 if matches:

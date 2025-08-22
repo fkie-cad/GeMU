@@ -9,11 +9,13 @@
 #include "win_spector.h"
 #include "gemu.h"
 
-void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb);
+void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb, bool is_chained);
 
 void gemu_cb_phys_memory_written(CPUArchState *env, target_ulong addr, uint64_t val, size_t size, uintptr_t retaddr);
 
 void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb);
+
+void gemu_cb_tracing(CPUState *cpu, TranslationBlock *tb, bool is_chained);
 
 void update_memory_map_from_env(CPUArchState *env);
 
