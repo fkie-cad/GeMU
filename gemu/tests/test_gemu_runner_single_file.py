@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 
 from gemuinteractor.recipe import Recipe
 from gemuinteractor.config_parser import VMConfig
-from gemuinteractor.gemu_run_decorator import RunDecorator
 from gemuinteractor.gemu_runner_single_file import GemuRunner
 
 SAMPLE_NAME = "testsample.exe"
@@ -39,9 +38,9 @@ TEST_CONFIG = {
     "SNAPSHOT": SNAPSHOT,
     "RAM": RAM_SIZE,
     "USER": "C:\\Users\\testuser",
-    "SYMBOLMAPPING": SYMBOLMAPPING.as_posix(),
-    "APIDOC": APIDOC.as_posix(),
-    "SYSCALLTABLE": SYSCALLTABLE.as_posix(),
+    "SYMBOLMAPPING": SYMBOLMAPPING,
+    "APIDOC": APIDOC,
+    "SYSCALLTABLE": SYSCALLTABLE,
     "PARAMETERS": ADDITIONAL_PARAMETERS
 }
 
@@ -54,7 +53,7 @@ class GemuInstanceMock:
         self.waited = None
 
     @contextmanager
-    def launch_gemu(self, params_string):
+    def launch_gemu(self, params_string: str):
         try:
             self.params_string = params_string
             yield True
@@ -64,6 +63,7 @@ class GemuInstanceMock:
         finally:
             return False
 
+    # TODO: types
     def write_to_qemu_console(self, command):
         self.written_to_qemu_console.append(command)
         self.sent_to_gemu.append(command.decode())
@@ -108,7 +108,7 @@ class TestGemuRunnerSingleFile:
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
 
         gemu_runner.run_sample()
@@ -123,7 +123,7 @@ class TestGemuRunnerSingleFile:
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME, export=EXPORT)
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME, export=EXPORT)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
 
         gemu_runner.decorate_run([])
@@ -138,7 +138,7 @@ class TestGemuRunnerSingleFile:
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
         mock_decorator = Mock()
         mock_decorator.return_code = "return1"
@@ -154,7 +154,7 @@ class TestGemuRunnerSingleFile:
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
         mock1 = Mock()
         mock1.return_code = "return1"
@@ -175,7 +175,7 @@ class TestGemuRunnerSingleFile:
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = tmpdir / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
-        recipe = Recipe(USER, sample_path.as_posix(), default_sample_name=SAMPLE_NAME)
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
 
         gemu_runner.run_sample()
@@ -194,11 +194,11 @@ class TestGemuRunnerSingleFile:
         sample_path = tmpdir / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
 
-        recipe_file = {"samples": [f"{SMALL_BITNESS_PE.as_posix()}:test2", f"{BIG_BITNESS_PE.as_posix()}:test4"], "cmds": ["echo hey", "echo ho"]}
+        recipe_file = {"samples": [f"{SMALL_BITNESS_PE}:test2", f"{BIG_BITNESS_PE}:test4"], "cmds": ["echo hey", "echo ho"]}
         recipe_file_name = Path(tmpdir) / "test.yml"
         with open(recipe_file_name, "w") as f:
             yaml.dump(recipe_file, f)
-        recipe = Recipe(USER, sample_path.as_posix(), recipe=recipe_file_name)
+        recipe = Recipe(USER, sample_path, recipe=recipe_file_name)
         
         gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
         gemu_runner.run_sample()

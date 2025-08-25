@@ -5,21 +5,22 @@ from contextlib import contextmanager
 from gemuinteractor.recipe import Recipe
 from gemuinteractor.config_parser import VMConfig
 from gemuinteractor.helpers import GemuInstance, build_iso_from_files
+from gemuinteractor.gemu_run_decorator import RunDecorator
 
 
 class GemuRunner:
-    def __init__(self, recording_time, trackingmode, dotnet, vm_config: VMConfig, recipe: Recipe,
+    def __init__(self, recording_time: int, trackingmode: str|None, dotnet: str|None, vm_config: VMConfig, recipe: Recipe,
                  gemu_instance: GemuInstance):
         self.recipe = recipe
         self.gemu_cmd = self._get_gemu_params(dotnet, trackingmode, vm_config)
         self.recording_time = recording_time
         self.gemu_instance = gemu_instance
-        self._decorators = []
+        self._decorators: list[RunDecorator] = []
 
-    def decorate_run(self, decorators):
+    def decorate_run(self, decorators: list[RunDecorator]):
         self._decorators = decorators
 
-    def _get_gemu_params(self, dotnet, trackingmode, vm_config):
+    def _get_gemu_params(self, dotnet:str|None, trackingmode:str|None, vm_config: VMConfig) -> str:
         trackingmode = "-trackingmode " + trackingmode if trackingmode else ""
         dotnet = "-dotnet " + dotnet if dotnet else ""
         return " ".join(
@@ -28,13 +29,13 @@ class GemuRunner:
                 "-monitor stdio",
                 *vm_config.additional_parameters,
                 "-loadvm", vm_config.snapshot,
-                "-symbolmapping", vm_config.symbolmapping.as_posix(),
-                "-apidoc", vm_config.apidoc.as_posix(),
+                "-symbolmapping", str(vm_config.symbolmapping),
+                "-apidoc", str(vm_config.apidoc),
                 "-watchedprograms", self.recipe.sample_name,
-                "-syscalltable", vm_config.syscalltable.as_posix(),
+                "-syscalltable", str(vm_config.syscalltable),
                 trackingmode,
                 dotnet,
-                vm_config.image.as_posix(),
+                str(vm_config.image),
             ]
         )
 
@@ -64,7 +65,7 @@ class GemuRunner:
         for decorator in self._decorators:
             decorator.start()
 
-    def _join_decorators(self):
+    def _join_decorators(self) -> dict[str, str]:
         return_states = dict()
         for decorator in self._decorators:
             decorator.stop()

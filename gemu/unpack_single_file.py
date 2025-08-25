@@ -13,10 +13,10 @@ def unpack_single_file(
     time: int,
     runname: str,
     export: str|None = None,
-    yararules: Path|None = None,
+    yararules: Path|str|None = None,
     dotnet: str|None = None,
     trackingmode: str|None = None,
-    recipe: Path|None = None
+    recipe: Path|str|None = None
 ) -> AnalysisFolder:
     """Main execution function for GEMU analysis.
     
@@ -33,7 +33,7 @@ def unpack_single_file(
     """
     vm_config = get_vm_settings(config)
     
-    recipe_obj = Recipe(user=vm_config.user, input_binary=sample.as_posix(), export=export or "", recipe=recipe)
+    recipe_obj = Recipe(user=vm_config.user, input_binary=sample, export=export or "", recipe=recipe)
     analysis_folder = AnalysisFolder(runname, sample)
     gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
     
@@ -48,7 +48,7 @@ def unpack_single_file(
     
     decorators: list[RunDecorator] = [WrittenFileMerger(sleep=2, gemu_instance=gemu_instance)]
     if yararules:
-        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=yararules.as_posix(), gemu_instance=gemu_instance))
+        decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=yararules, gemu_instance=gemu_instance))
     runner.decorate_run(decorators)
 
     runner.run_sample()
@@ -61,6 +61,11 @@ def existing_path(path_str: str) -> Path:
         raise FileNotFoundError()
     return path
 
+def optional_existing_path(path_str: str) -> Path|None:
+    if not path_str:
+        return None
+    return existing_path(path_str)
+
 def cli_main() -> None:
     """CLI entry point that handles argument parsing."""
     parser = argparse.ArgumentParser(description="GEMU malware analysis tool")
@@ -70,10 +75,10 @@ def cli_main() -> None:
     parser.add_argument("--config", help="VM configuration name", default="win10")
     parser.add_argument("--runname", help="Name of the analysis run", default="gemu")
     parser.add_argument("--export", help="PE file export to launch", default=None)
-    parser.add_argument("--yararules", help="Path to compiled YARA rules for early exit", type=existing_path, default=None)
+    parser.add_argument("--yararules", help="Path to compiled YARA rules for early exit", type=optional_existing_path, default=None)
     parser.add_argument("--dotnet", help=".NET tracking mode", metavar="on|off|auto")
     parser.add_argument("--trackingmode", help="WinAPI tracking mode", metavar="syscall|basicblock|both")
-    parser.add_argument("--recipe", help="Path to specific recipe file", type=existing_path, default=None)
+    parser.add_argument("--recipe", help="Path to specific recipe file", type=optional_existing_path, default=None)
     
     
     args = parser.parse_args()

@@ -1,17 +1,18 @@
 from pathlib import Path
 
-GEMU_FOLDER = Path(__file__).parent / ".."
+GEMU_FOLDER = Path(__file__).parents[1]
 
 # Dicts in the following format can be referenced by name via the --config parameter. E.g. --config win7
+# You can use str or Path for host paths.
 
 win7 = {
     "VM_IMAGE_PATH": "/path/to/vm",
     "SNAPSHOT": "dotnet8.0.8+framework4.8fixed",
     "RAM": "2056",
     "USER": "C:\\Users\\analyst\\",
-    "SYMBOLMAPPING": (GEMU_FOLDER / "symbol_mapping_win7.txt").as_posix(),
-    "APIDOC": (GEMU_FOLDER / "apidoc.json").as_posix(),
-    "SYSCALLTABLE": (GEMU_FOLDER / "syscalltable.json").as_posix(),
+    "SYMBOLMAPPING": GEMU_FOLDER / "symbol_mapping_win7.txt",
+    "APIDOC": GEMU_FOLDER / "apidoc.json",
+    "SYSCALLTABLE": GEMU_FOLDER / "syscalltable.json",
 }
 
 win10 = {
@@ -23,9 +24,9 @@ win10 = {
         "-acpitable",
         "/path/to/DSDT_OEM.bin",
     ],
-    "SYMBOLMAPPING": (GEMU_FOLDER / "symbol_mapping_win10.txt").as_posix(),
-    "APIDOC": (GEMU_FOLDER / "apidoc.json").as_posix(),
-    "SYSCALLTABLE": (GEMU_FOLDER / "syscalltable.json").as_posix(),
+    "SYMBOLMAPPING": GEMU_FOLDER / "symbol_mapping_win10.txt",
+    "APIDOC": GEMU_FOLDER / "apidoc.json",
+    "SYSCALLTABLE": GEMU_FOLDER / "syscalltable.json",
 }
 
 

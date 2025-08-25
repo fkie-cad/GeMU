@@ -8,7 +8,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--samples",
-        help="Provide a list of samples or list of folders containing samples or a folder containing samples",
+        help="Provide a path to a line separated list containing samples/folder-paths of samples or to a folder containing samples",
         required=True
     )
     parser.add_argument(

@@ -8,13 +8,12 @@ from pathlib import Path
 import pytest
 
 from gemu.unpack_single_file import unpack_single_file
-from gemuinteractor.gemu_run_decorator import WrittenFileMerger, YaraEarlyExiter
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
 from gemuinteractor.recipe import Recipe
 from gemuinteractor.gemu_runner_single_file import GemuRunner
-from gemuinteractor.config_parser import GEMU_PATH, SAMPLE_NAME, get_vm_settings
+from gemuinteractor.config_parser import GEMU_PATH, get_vm_settings
 from tests.generate_shellcode import generate_shellcode_main
-from tests.test_gemu_runner_single_file import SMALL_BITNESS_PE, USER
+from tests.test_gemu_runner_single_file import SMALL_BITNESS_PE
 
 compilers = {32: "i686-w64-mingw32-gcc", 64: "x86_64-w64-mingw32-gcc"}
 
@@ -23,7 +22,7 @@ compilers = {32: "i686-w64-mingw32-gcc", 64: "x86_64-w64-mingw32-gcc"}
 TEST_FOLDER = Path(__file__).parent
 RUNNAME = "gemu_testrun"
 
-def compile(input_path, output_path, bitness, cwd=None):
+def compile(input_path: Path|str, output_path: Path|str, bitness: int, cwd=None):
     compiler = compilers[bitness]
     command = f"{compiler} -o {output_path} {input_path}"
     result = subprocess.run(command, shell=True, cwd=cwd)
@@ -35,25 +34,25 @@ def compiled_tests_folder(tmp_path_factory):
     return output_path
 
 
-def compile_test(compiled_tests_folder: Path, test_name: str, bitness) -> str:
+def compile_test(compiled_tests_folder: Path, test_name: str, bitness) -> Path:
     output_name = f"{test_name}_{bitness}.exe"
-    output_path = (compiled_tests_folder / output_name).as_posix()
-    compile(f"{test_name}.c", output_path, bitness, cwd=TEST_FOLDER.as_posix())
+    output_path = compiled_tests_folder / output_name
+    compile(f"{test_name}.c", output_path, bitness, cwd=TEST_FOLDER)
     return output_path
 
 def make_gemu():
     build_folder = Path(__file__).parent.parent.parent/"build"
-    result = subprocess.run("make -j`nproc`", shell=True, cwd=build_folder.as_posix())
+    result = subprocess.run("make -j`nproc`", shell=True, cwd=build_folder)
     assert result.returncode == 0
 
 # def clear_test_runs():
 #     for run_folder in TEST_FOLDER.glob(f"*_{RUNNAME}_*"):
-#         print("remove", run_folder.absolute().as_posix())
-#         shutil.rmtree(run_folder.absolute().as_posix())
+#         print("remove", run_folder.absolute())
+#         shutil.rmtree(str(run_folder.absolute()))
 
 # def clear_exes():
 #     for exe_file in TEST_FOLDER.glob(f"*.exe"):
-#         print("remove", exe_file.absolute().as_posix())
+#         print("remove", exe_file.absolute())
 #         exe_file.absolute().unlink()
 
 
@@ -86,7 +85,7 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmo
     yararules = (TEST_FOLDER/"shellcode.yarc")
 
     analysis_folder = unpack_single_file(
-        sample=Path(sample_path),
+        sample=sample_path,
         config="win10",
         time=120,
         runname=f"gemutest-{trackingmode}",
@@ -98,16 +97,26 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmo
     
     assert not analysis_folder.dumps_folder.exists()
 
+def test_timeout(tmpdir):
+    shutil.copy(SMALL_BITNESS_PE, tmpdir)
+    copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
+    analysis_folder = unpack_single_file(
+        sample=copied_pe,
+        time=10,
+        runname="timeout_test",
+        config="win10"
+    )
+    assert "REASON FOR GEMU EXIT: timeout" in analysis_folder.runlog.read_text()
 
 def test_qcow_is_released_from_first_instance(tmpdir):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
     copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
     vm_config = get_vm_settings("win10")
-    recipe = Recipe(vm_config.user, copied_pe.as_posix())
-    analysis_folder = AnalysisFolder("tobekilled", Path(copied_pe))
+    recipe = Recipe(vm_config.user, copied_pe)
+    analysis_folder = AnalysisFolder("tobekilled", copied_pe)
     gemu_instance = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder)
     runner = GemuRunner(120, "syscall", "off", vm_config, recipe, gemu_instance)
-    analysis_folder2 = AnalysisFolder("killing", Path(copied_pe))
+    analysis_folder2 = AnalysisFolder("killing", copied_pe)
     gemu_instance2 = GemuInstance(vm_config.image, GEMU_PATH, analysis_folder2)
 
     first_gemu = threading.Thread(target=runner.run_sample)

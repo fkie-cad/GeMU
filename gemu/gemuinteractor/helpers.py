@@ -9,17 +9,18 @@ from threading import Lock
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterable
 
 class AnalysisFolder:
-    def __init__(self, runname, input_binary: Path):
-        self.analysis_folder = self._build_analysis_folder(runname, input_binary)
+    def __init__(self, runname: str, input_binary: Path|str):
+        self.analysis_folder = self._build_analysis_folder(runname, str(input_binary))
         self.runlog = self.analysis_folder / "runlog"
         self.dumps_folder = self.analysis_folder / "dumps"
         self.dumps_zip = self.analysis_folder / "dumps.zip"
 
-    def _build_analysis_folder(self, runname, input_binary) -> Path:
+    def _build_analysis_folder(self, runname: str, input_binary: str) -> Path:
         analysis_folder = Path(
-            f"{input_binary.as_posix()}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+            f"{input_binary}_{runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
         )
         analysis_folder.mkdir(exist_ok=True)
         os.symlink(input_binary, f"{analysis_folder}/sample")
@@ -27,24 +28,51 @@ class AnalysisFolder:
 
     def zip_dumps_folder(self):
         if self.dumps_folder.exists():
-            subprocess.run(f"sync '{self.dumps_folder.as_posix()}'", shell=True)
-            shutil.make_archive(self.dumps_folder.as_posix(), "zip", self.dumps_folder.as_posix())
+            subprocess.run(f"sync '{self.dumps_folder}'", shell=True)
+            shutil.make_archive(str(self.dumps_folder), "zip", str(self.dumps_folder))
             shutil.rmtree(self.dumps_folder, ignore_errors=True)
 
-class GemuInstance:
-    def __init__(self, image, gemu_path, analysis_folder: AnalysisFolder):
-        self.image = image
-        self.gemu_path = gemu_path
-        self.analysis_folder = analysis_folder
-        self.process = None
-        self._lock = Lock()
-        self.reason_for_gemu_end = "normal"
+# Not in function def for efficiency
+KEYMAP = {
+    "-": "minus",
+    "=": "equal",
+    "[": "bracket_left",
+    "]": "bracket_right",
+    ";": "semicolon",
+    "'": "apostrophe",
+    "\\": "backslash",
+    ",": "comma",
+    ".": "dot",
+    "/": "slash",
+    "*": "asterisk",
+    " ": "spc",
+    "_": "shift-minus",
+    "+": "shift-equal",
+    "{": "shift-bracket_left",
+    "}": "shift-bracket_right",
+    ":": "shift-semicolon",
+    '"': "shift-apostrophe",
+    "|": "shift-backslash",
+    "<": "shift-comma",
+    ">": "shift-dot",
+    "?": "shift-slash",
+    "\n": "ret",
+}
 
-    def _launch(self, parameters):
+class GemuInstance:
+    def __init__(self, image: Path|str, gemu_path: Path|str, analysis_folder: AnalysisFolder):
+        self._image = Path(image)
+        self._gemu_path = Path(gemu_path)
+        self.analysis_folder = analysis_folder
+        self._process: subprocess.Popen|None = None
+        self._lock = Lock()
+        self._reason_for_gemu_end = "normal"
+
+    def _launch(self, parameters: str):
         self._try_to_free_image()
-        cmd = f"{self.gemu_path} {parameters} > {self.analysis_folder.runlog}",
+        cmd = f"{self._gemu_path} {parameters} > {self.analysis_folder.runlog}",
         print("Executing command:", cmd)
-        self.process = subprocess.Popen(
+        self._process = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, shell=True, cwd=self.analysis_folder.analysis_folder,
         )
         time.sleep(5)
@@ -57,28 +85,28 @@ class GemuInstance:
             except BrokenPipeError:
                 pass
             try:
-                self.process.wait(timeout=1)
+                self._process.wait(timeout=1)
             except subprocess.TimeoutExpired:
                 pass
-            self.process.kill()
+            self._process.kill()
 
-    def log_return_status(self, state):
+    def log_return_status(self, decorator_state: dict):
         with open(self.analysis_folder.runlog, "a") as f:
-            f.write(f"EXIT STATES OF DECORATORS: {json.dumps(state)}\n")
-            f.write(f"PROCESS RETURN CODE: {str(self.process.poll())}\n")
-            f.write(f"REASON FOR GEMU EXIT: {self.reason_for_gemu_end}\n")
+            f.write(f"EXIT STATES OF DECORATORS: {json.dumps(decorator_state)}\n")
+            f.write(f"PROCESS RETURN CODE: {str(self._process.poll())}\n")
+            f.write(f"REASON FOR GEMU EXIT: {self._reason_for_gemu_end}\n")
             
     def _try_to_free_image(self):
-        lock_found, qemu_pid = self._check_qcow_lock()
-        while lock_found:
-            self._kill_other_qemu_process(qemu_pid)
+        qemu_locking_pid = self._check_qcow_lock()
+        while qemu_locking_pid is not None:
+            self._kill_other_qemu_process(qemu_locking_pid)
             print("checking lock again")
-            lock_found, qemu_pid = self._check_qcow_lock()
-        print("No QEMU process holding write lock on", self.image, "found.")
+            qemu_locking_pid = self._check_qcow_lock()
+        print("No QEMU process holding write lock on", self._image, "found.")
 
-    def _check_qcow_lock(self):
+    def _check_qcow_lock(self) -> str|None:
         try:
-            output = subprocess.check_output(["lsof", "-F", "npk", self.image])
+            output = subprocess.check_output(["lsof", "-F", "npk", str(self._image)])
             print(output)
             lines = output.decode().split("\n")
             pid = None
@@ -88,11 +116,14 @@ class GemuInstance:
                     pid = line[1:]
                 elif line.startswith("k") and "1" in line[1:]:  # Check if locked
                     locked = True
-            return locked, pid
+            if locked is True:
+                return pid
+            else:
+                return None
         except subprocess.CalledProcessError:
-            return False, None
+            return None
 
-    def _kill_other_qemu_process(self, pid):
+    def _kill_other_qemu_process(self, pid: str):
         try:
             subprocess.run(["kill", "-9", pid], check=True)
             print("QEMU process with PID", pid, "has been terminated. Sleeping for 5 seconds")
@@ -101,71 +132,41 @@ class GemuInstance:
             print("Failed to terminate QEMU process with PID", pid)
 
     @contextmanager
-    def launch_gemu(self, params_string):
+    def launch_gemu(self, params_string: str):
         try:
             self._launch(params_string)
             yield True
         except Exception as e:
-            self.reason_for_gemu_end = f"error({traceback.format_exc()})"
-            self.kill()
+            self._reason_for_gemu_end = f"error({traceback.format_exc()})"
         finally:
             self.kill()
 
-    def write_to_qemu_console(self, command):
-        self.process.stdin.write(command)
-        self.process.stdin.flush()
+    def write_to_qemu_console(self, command: bytes):
+        self._process.stdin.write(command)
+        self._process.stdin.flush()
 
-    def wait(self, timeout):
+    def wait(self, timeout: int|float|None):
         try:
             print(
                 f"{datetime.datetime.now()} sleeping for {timeout}"
             )
-            self.process.wait(timeout)
+            self._process.wait(timeout)
             print("sleep over.. shutting down")
         except subprocess.TimeoutExpired:
             print("timeout expired.. shutting down")
-            self.reason_for_gemu_end = "timeout"
+            self._reason_for_gemu_end = "timeout"
 
-    def get_return_code(self):
-        return self.process.returncode
-
-    def type_into_guest(self, command):
-        keymap = {
-            "-": "minus",
-            "=": "equal",
-            "[": "bracket_left",
-            "]": "bracket_right",
-            ";": "semicolon",
-            "'": "apostrophe",
-            "\\": "backslash",
-            ",": "comma",
-            ".": "dot",
-            "/": "slash",
-            "*": "asterisk",
-            " ": "spc",
-            "_": "shift-minus",
-            "+": "shift-equal",
-            "{": "shift-bracket_left",
-            "}": "shift-bracket_right",
-            ":": "shift-semicolon",
-            '"': "shift-apostrophe",
-            "|": "shift-backslash",
-            "<": "shift-comma",
-            ">": "shift-dot",
-            "?": "shift-slash",
-            "\n": "ret",
-        }
-
+    def type_into_guest(self, command: str):
         for c in command:
             if c in string.ascii_uppercase:
                 key = "shift-" + c.lower()
             else:
-                key = keymap.get(c, c)
+                key = KEYMAP.get(c, c)
 
             self.write_to_qemu_console(b"sendkey " + key.encode(encoding="utf-8") + b"\n")
             time.sleep(0.001)
 
-def build_iso_from_files(samples: set[Path], tmpdir):
+def build_iso_from_files(samples: Iterable[Path], tmpdir: str|Path) -> Path:
     tmpdir = Path(tmpdir)
     for sample in samples:
         if " " in sample.name:
@@ -182,7 +183,7 @@ def build_iso_from_files(samples: set[Path], tmpdir):
         "-R",
         "-J",
         "-o",
-        temp_iso.as_posix(),
-        tmpdir.as_posix()
+        str(temp_iso),
+        str(tmpdir)
     ])
     return temp_iso

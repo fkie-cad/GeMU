@@ -1,7 +1,6 @@
 import os
 import subprocess
 import tempfile
-import threading
 import time
 from pathlib import Path
 from unittest.mock import Mock
@@ -55,12 +54,13 @@ class TestYaraEarlyExiter:
         mock_gemu.kill.assert_called_once()
 
     def test_decorate_without_match(self, tmpdir, mock_gemu, yara_rule_file):
-        testdump = os.path.join(tmpdir, "testdump")
+        tmpdir = Path(tmpdir)
+        testdump = tmpdir / "testdump"
         with open(testdump, 'w') as f:
             f.write("This file contains test_string to match")
 
         exiter = YaraEarlyExiter(1, yara_rule_file, mock_gemu)
-        exiter.dump_folder = Path(tmpdir)
+        exiter.dump_folder = tmpdir
         exiter.checked_files.add(testdump)
 
         exiter.start()

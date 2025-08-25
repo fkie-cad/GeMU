@@ -9,7 +9,7 @@ from tests.test_gemu_runner_single_file import USER, SMALL_BITNESS_PE, BIG_BITNE
 
 
 def test_recipe_get_native_binary():
-    recipe = Recipe(USER, SMALL_BITNESS_PE.as_posix())
+    recipe = Recipe(USER, SMALL_BITNESS_PE)
 
     assert recipe.sample_name == SAMPLE_NAME
     assert recipe.commands == ['start C:\\Users\\testuser\\Desktop\\ahsofi.exe']
@@ -17,7 +17,7 @@ def test_recipe_get_native_binary():
     assert recipe.requirements == {SMALL_BITNESS_PE}
 
 def test_recipe_get_native_binary_with_export():
-    recipe = Recipe(USER, SMALL_BITNESS_PE.as_posix(), export="TestExport")
+    recipe = Recipe(USER, SMALL_BITNESS_PE, export="TestExport")
 
     assert recipe.sample_name == SAMPLE_NAME
     assert recipe.commands == ['copy C:\\Windows\\SysWOW64\\rundll32.exe '
@@ -28,7 +28,7 @@ def test_recipe_get_native_binary_with_export():
     assert recipe.requirements == {SMALL_BITNESS_PE}
 
 def test_recipe_get_native_binary_with_export_big_bitness():
-    recipe = Recipe(USER, BIG_BITNESS_PE.as_posix(), export="TestExport")
+    recipe = Recipe(USER, BIG_BITNESS_PE, export="TestExport")
 
     assert recipe.sample_name == SAMPLE_NAME
     assert recipe.commands == ['copy C:\\Windows\\system32\\rundll32.exe '
@@ -43,7 +43,7 @@ def test_recipe_get_forced_recipe(tmpdir):
     recipe_file_name = Path(tmpdir) / "test.yml"
     with open(recipe_file_name, "w") as f:
         yaml.dump(recipe_file, f)
-    recipe = Recipe(USER, SMALL_BITNESS_PE.as_posix(), recipe=recipe_file_name, export="TestExport")
+    recipe = Recipe(USER, SMALL_BITNESS_PE, recipe=recipe_file_name, export="TestExport")
 
     assert recipe.sample_name == "TestSample"
     assert recipe.commands == ["echo hey"]
@@ -55,4 +55,4 @@ def test_recipe_not_implemented_error(tmpdir):
     with open(sample_name, "wb") as f:
         f.write(b"test")
     with pytest.raises(NotImplementedError):
-        Recipe(USER, sample_name.as_posix())
+        Recipe(USER, sample_name)

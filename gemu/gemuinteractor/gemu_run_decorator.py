@@ -8,12 +8,12 @@ from gemuinteractor.helpers import GemuInstance
 
 
 class RunDecorator:
-    def __init__(self, sleep: int, gemu_instance: GemuInstance):
+    def __init__(self, sleep: int|float, gemu_instance: GemuInstance):
         self._sleep = sleep
         self._gemu_instance = gemu_instance
         self._stop_decorator = False
         self._thread = None
-        self.return_code = ""
+        self.return_code: str = ""
 
     def _run(self):
         while True:
@@ -35,33 +35,32 @@ class RunDecorator:
         raise NotImplementedError
 
 class YaraEarlyExiter(RunDecorator):
-    def __init__(self, sleep, yara_rules:str, gemu_instance: GemuInstance):
+    def __init__(self, sleep: int|float, yara_rules: Path|str, gemu_instance: GemuInstance):
         super().__init__(sleep, gemu_instance)
-        self.yara_rules = yara_rules
-        self._init_scanner()
+        self._init_scanner(str(yara_rules))
 
-    def _init_scanner(self):
+    def _init_scanner(self, yara_rules: str):
         import yara
         print("getting rules")
-        self.rules = yara.load(self.yara_rules)
-        self.checked_files = set()
-        self.dump_folder = self._gemu_instance.analysis_folder.dumps_folder
+        self.rules = yara.load(yara_rules)
+        self.checked_files: set[Path] = set()
+        self.dump_folder: Path = self._gemu_instance.analysis_folder.dumps_folder
         self._yara_error = yara.Error
 
     def _decorate(self):
         if not self.dump_folder.exists():
             return
-        for i in self.dump_folder.iterdir():
-            if i.as_posix() in self.checked_files:
+        for dump in self.dump_folder.iterdir():
+            if dump in self.checked_files:
                 continue
-            print(f"checking file {i.as_posix()}")
+            print(f"checking file {dump}")
             try:
-                matches = self.rules.match(i.as_posix())
-                self.checked_files.add(i.as_posix())
+                matches = self.rules.match(str(dump))
+                self.checked_files.add(dump)
                 if matches:
-                    print(f"Found {[match.rule for match in matches]} in {i}")
+                    print(f"Found {[match.rule for match in matches]} in {dump}")
                     print("Exiting early")
-                    self.return_code = f"match({[match.rule for match in matches]},{i})"
+                    self.return_code = f"match({[match.rule for match in matches]},{dump})"
                     self._gemu_instance.kill()
                     return
             except self._yara_error: #File might not be readable (because of WrittenFileMerger)

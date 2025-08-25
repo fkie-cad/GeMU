@@ -8,13 +8,13 @@ from gemuinteractor.config_parser import SAMPLE_NAME
 RECIPE_FOLDER = Path(__file__).parent / "recipes"
 
 class Recipe:
-    def __init__(self, user: str, input_binary: str, export: str = "", recipe: Path|None = None,  default_sample_name: str = SAMPLE_NAME):
+    def __init__(self, user: str, input_binary: Path|str, export: str = "", recipe: Path|str|None = None,  default_sample_name: str = SAMPLE_NAME):
         self._recipe_dict = self.parse_yaml(recipe) if recipe else self._get_recipe_dict(input_binary, export)
         self.sample_name: str = self._recipe_dict.get("overwriteinitprocess", default_sample_name)
-        self._replacements = {
+        self._replacements: dict[str, str] = {
             "$USER": user,
             "$SAMPLE_NAME": self.sample_name, 
-            "$INPUTBINARY": input_binary,
+            "$INPUTBINARY": str(input_binary),
             "$EXPORT": export
         }
         self._process_recipe()
@@ -34,7 +34,7 @@ class Recipe:
             text = text.replace(old, new)
         return text
 
-    def _get_recipe_dict(self, sample: str, export: str|None):
+    def _get_recipe_dict(self, sample: Path|str, export: str|None) -> dict:
         filetype = subprocess.check_output(["file", sample]).decode("utf-8")
         if "PE" in filetype:
             if export:
@@ -47,5 +47,5 @@ class Recipe:
         raise NotImplementedError
 
     @staticmethod
-    def parse_yaml(yamlfile: Path):
-        return yaml.safe_load(yamlfile.read_text())
+    def parse_yaml(yamlfile: Path|str) -> dict:
+        return yaml.safe_load(Path(yamlfile).read_text())
