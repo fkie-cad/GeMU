@@ -45,27 +45,27 @@ class PlatformAgnosticTests(BasePlatformTests):
 
         fname = write_file("option('default_library', type: 'string')")
         self.assertRaisesRegex(OptionException, 'Option name default_library is reserved.',
-                               interp.process, fname)
+                               interp.gemu_instance, fname)
 
         fname = write_file("option('c_anything', type: 'string')")
         self.assertRaisesRegex(OptionException, 'Option name c_anything is reserved.',
-                               interp.process, fname)
+                               interp.gemu_instance, fname)
 
         fname = write_file("option('b_anything', type: 'string')")
         self.assertRaisesRegex(OptionException, 'Option name b_anything is reserved.',
-                               interp.process, fname)
+                               interp.gemu_instance, fname)
 
         fname = write_file("option('backend_anything', type: 'string')")
         self.assertRaisesRegex(OptionException, 'Option name backend_anything is reserved.',
-                               interp.process, fname)
+                               interp.gemu_instance, fname)
 
         fname = write_file("option('foo.bar', type: 'string')")
         self.assertRaisesRegex(OptionException, 'Option names can only contain letters, numbers or dashes.',
-                               interp.process, fname)
+                               interp.gemu_instance, fname)
 
         # platlib is allowed, only python.platlib is reserved.
         fname = write_file("option('platlib', type: 'string')")
-        interp.process(fname)
+        interp.gemu_instance(fname)
 
     def test_python_dependency_without_pkgconfig(self):
         testdir = os.path.join(self.unit_test_dir, '103 python without pkgconfig')

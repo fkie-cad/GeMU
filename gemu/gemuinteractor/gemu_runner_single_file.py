@@ -1,291 +1,82 @@
-from collections import defaultdict
-import datetime
-import json
-import os
-import shutil
-import subprocess
-import sys
+import tempfile
 import time
-import traceback
-from pathlib import Path
-import threading
+from contextlib import contextmanager
 
-from gemuinteractor.config_parser import GEMU_PATH, SAMPLE_NAME, VMConfig
-from gemuinteractor.helpers import guest_type, build_iso_from_file
+from gemuinteractor.recipe import Recipe
+from gemuinteractor.config_parser import VMConfig
+from gemuinteractor.helpers import GemuInstance, build_iso_from_files
+from gemuinteractor.gemu_run_decorator import RunDecorator
 
 
-class GemuRunnerSingleFile:
-    def __init__(self, sample, recording_time, runname, export, yararules, trackingmode, dotnet, vm_config:VMConfig):
-        self.sample = sample
-        self.runname = runname
-        self.vm_config = vm_config
-        self.export = export
-        self.sample_is_64bit = "PE32+" in subprocess.check_output(["file", self.sample]).decode("utf-8")
-        self.analysis_folder = self.build_analysis_folder()
+class GemuRunner:
+    def __init__(self, recording_time: int, trackingmode: str|None, dotnet: str|None, vm_config: VMConfig, recipe: Recipe,
+                 gemu_instance: GemuInstance):
+        self.recipe = recipe
+        self.gemu_cmd = self._get_gemu_params(dotnet, trackingmode, vm_config)
         self.recording_time = recording_time
-        self.log = dict()
-        self.log_message({"vm": self.vm_config.image.as_posix()})
-        self.process = None
-        self.output_path = None
-        self.trackingmode = trackingmode
-        self.dotnet = dotnet
-        self.rules = None
-        self.sample_name = SAMPLE_NAME
-        self.early_exiter = None
-        self.stop_early_exiter = False
-        self.return_status = "normal"
-        if yararules:
-            import yara
-            self.rules = yara.load(yararules)
+        self.gemu_instance = gemu_instance
+        self._decorators: list[RunDecorator] = []
 
-    def check_for_early_exit_yara_rules(self):
-        checked_files = set()
-        dump_folder = self.analysis_folder / "dumps"
-        print("getting rules")
-        while not self.stop_early_exiter:
-            time.sleep(2)
-            if not dump_folder.exists():
-                continue
-            self.merge_writtenfiles()
-            for i in dump_folder.iterdir():
-                if i.as_posix() in checked_files:
-                    continue
-                print(f"checking file {i.as_posix()}")
-                matches = self.rules.match(i.as_posix())
-                if not matches:
-                    checked_files.add(i.as_posix())
-                else:
-                    print(f"Found {[match.rule for match in matches]} in {i}")
-                    print("Exiting early")
-                    self.return_status = f"match({[match.rule for match in matches]},{i})"
-                    self.process.kill()
-                    return
+    def decorate_run(self, decorators: list[RunDecorator]):
+        self._decorators = decorators
 
-    # not thread safe
-    def merge_writtenfiles(self):
-        dump_folder = self.analysis_folder / "dumps"
-        if not dump_folder.exists():
-            return
-
-        dumps_by_handle = defaultdict(list)
-        merge_by_handle = dict()
-        for path in dump_folder.iterdir():
-            if "_writtenfile_" in path.name:
-                handle = path.name[:path.name.find("_writtenfile_")]
-                number = int(path.name.split("_nr_")[-1])
-                dumps_by_handle[handle].append((number, path))
-            if "_writtenfilemerge_" in path.name:
-                handle = path.name[:path.name.find("_writtenfilemerge_")]
-                number = int(path.name.split("_nr_")[-1])
-                merge_by_handle[handle] = number, path
-
-        for handle, dumps in dumps_by_handle.items():
-            dumps: list[tuple[int, Path]]
-            if len(dumps) < 2:
-                continue
-
-            old_merge_file: Path
-            old_merge_num, old_merge_file = merge_by_handle.get(handle, (-1, None))
-
-            dumps.sort(key=lambda x: x[0])  # sort by number
-            new_merge_num = dumps[-1][0]
-            if old_merge_num >= new_merge_num:
-                continue
-
-            # Extract timestamp from the newest dump file name
-            latest_dump = dumps[-1][1].name
-            try:
-                timestamp_part = latest_dump.split("_nr_")[0].split("_")[-1]
-            except IndexError:
-                # This shouldn't happen
-                continue
-
-            # Build the new merge filename
-            new_merge_filename = f"{handle}_writtenfilemerge_{timestamp_part}_nr_{new_merge_num}"
-            new_merge_file = dumps[0][1].parent / new_merge_filename
-
-            if old_merge_file is not None:
-                new_merge_file = old_merge_file.rename(new_merge_file)
-
-            with open(new_merge_file, "ab") as file_out:
-                for dump_number, dump_path in dumps:
-                    if dump_number <= old_merge_num:
-                        continue
-                    with open(dump_path, "rb") as file_in:
-                        shutil.copyfileobj(file_in, file_out)
-
-    def run_sample(self):
-        self.try_to_free_image()
-        try:
-            self.launch_gemu()
-            self.mount_sample()
-            self.launch_sample()
-            print("launched sample")
-            if self.rules:
-                self.early_exiter = threading.Thread(target=self.check_for_early_exit_yara_rules)
-                self.early_exiter.start()
-            while True:
-                try:
-                    print(
-                        f"{datetime.datetime.now()} sleeping for {self.recording_time}"
-                    )
-                    self.process.wait(self.recording_time)
-                    print("sleep over.. shutting down")
-                    break
-                except BrokenPipeError:
-                    continue
-                except subprocess.TimeoutExpired:
-                    print("timeout expired.. shutting down")
-                    self.return_status = "timeout"
-                    break
-        finally:
-            traceback.print_exc()
-            if self.return_status == "normal" and self.process.returncode != 0:
-                self.return_status = f"error({self.process.returncode})"
-            if self.early_exiter:
-                self.stop_early_exiter = True
-                self.early_exiter.join()
-            else:
-                self.merge_writtenfiles()
-            self.process.stdin.write(b"system_powerdown\n")
-            self.process.stdin.write(b"quit\n")
-            try:
-                self.process.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                pass
-            self.process.kill()
-            # Cleanup ISO directory
-            if self.output_path.parent.exists():
-                shutil.rmtree(self.output_path.parent)
-            self.zip_dumps_folder()
-            return self.return_status
-
-    def zip_dumps_folder(self):
-        dumps_folder = self.analysis_folder / "dumps"
-        if dumps_folder.exists():
-            subprocess.run(f"sync '{dumps_folder.as_posix()}'", shell=True)
-            shutil.make_archive(dumps_folder.as_posix(), "zip", dumps_folder.as_posix())
-            shutil.rmtree(dumps_folder, ignore_errors=True)
-
-    def log_message(self, message):
-        self.log.update(message)
-        with open(self.analysis_folder / "log", "w") as f:
-            f.write(json.dumps(self.log))
-
-    def build_analysis_folder(self):
-        if self.export:
-            analysis_folder = Path(
-                f"{self.sample}_EXPORT:{self.export}_{self.runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            )
-        else:
-            analysis_folder = Path(
-                f"{self.sample}_{self.runname}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-            )
-        analysis_folder.mkdir(exist_ok=True)
-        os.symlink(self.sample, f"{analysis_folder}/sample")
-        return analysis_folder
-
-    def launch_gemu(self):
-        trackingmode = "-trackingmode " + self.trackingmode if self.trackingmode else ""
-        dotnet = "-dotnet " + self.dotnet if self.dotnet else ""
-        cmd = " ".join(
+    def _get_gemu_params(self, dotnet:str|None, trackingmode:str|None, vm_config: VMConfig) -> str:
+        trackingmode = "-trackingmode " + trackingmode if trackingmode else ""
+        dotnet = "-dotnet " + dotnet if dotnet else ""
+        return " ".join(
             [
-                GEMU_PATH,
-                "-m", self.vm_config.ram_size,
+                "-m", vm_config.ram_size,
                 "-monitor stdio",
-                *self.vm_config.additional_parameters,
-                "-loadvm", self.vm_config.snapshot,
-                "-symbolmapping", self.vm_config.symbolmapping.as_posix(),
-                "-apidoc", self.vm_config.apidoc.as_posix(),
-                "-watchedprograms", self.sample_name,
-                "-syscalltable", self.vm_config.syscalltable.as_posix(),
+                *vm_config.additional_parameters,
+                "-loadvm", vm_config.snapshot,
+                "-symbolmapping", str(vm_config.symbolmapping),
+                "-apidoc", str(vm_config.apidoc),
+                "-watchedprograms", self.recipe.sample_name,
+                "-syscalltable", str(vm_config.syscalltable),
                 trackingmode,
                 dotnet,
-                self.vm_config.image.as_posix(),
-                f"> {self.analysis_folder}/runlog",
+                str(vm_config.image),
             ]
         )
-        print("Executing command:", cmd)
-        self.process = subprocess.Popen(
-            cmd, stdin=subprocess.PIPE, shell=True, cwd=self.analysis_folder
-        )
-        time.sleep(5)
 
-    def launch_sample_with_export(self):
-        user = self.vm_config.user
-        self.process.stdin.flush()
-        if self.sample_is_64bit:
-            guest_type(f" copy C:\\Windows\\system32\\rundll32.exe {user}Desktop\\{self.sample_name}\n",
-                       self.process)
-        else:
-            guest_type(f" copy C:\\Windows\\SysWOW64\\rundll32.exe {user}Desktop\\{self.sample_name}\n",
-                       self.process)
-        time.sleep(1)
-        guest_type(f" copy D:\\{self.sample_name} {user}Desktop\\ahsofidll.dll\n", self.process)
-        self.process.stdin.write(b"gemurec\n")
-        self.process.stdin.flush()
-        print(f"starting PE with RUNDLL and {self.export}...")
-        time.sleep(1)
-        self.log_message({"starttimestamp": time.time()})
-        guest_type(f"start {user}Desktop\\{self.sample_name} ahsofidll.dll,{self.export}\n", self.process)
+    @contextmanager
+    def _mount_samples(self):
+        print("mounting samples...")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = build_iso_from_files(self.recipe.requirements, tmpdir=tmpdir)
+            self.gemu_instance.write_to_qemu_console(f"change ide1-cd0 {output_path}\n".encode(encoding="utf-8"))
+            self.gemu_instance.write_to_qemu_console(b"sendkey esc\n")
+            for local, remote in self.recipe.mountings:
+                self.gemu_instance.type_into_guest(f"copy D:\\{local.name} {remote}\n")
+            try:
+                yield
+            finally:
+                return
 
-    def mount_sample(self):
-        self.output_path = build_iso_from_file(Path(self.sample),
-                                               sample_name=self.sample_name,
-                                               iso_output_path=Path(Path(self.sample).name.replace(" ", "") + ".iso"))
-        cmd = f"change ide1-cd0 {self.output_path}\n".encode(encoding="utf-8")
-        print(cmd)
-        self.process.stdin.write(cmd)
-        self.process.stdin.flush()
-        print("mounting")
-        self.process.stdin.write(b"sendkey esc\n")
-        return self.output_path
-
-    def launch_sample(self):
-        user = self.vm_config.user
-        if self.export:
-            self.launch_sample_with_export()
-            return
-        guest_type(
-            f" copy D:\\{self.sample_name} {user}Desktop\\{self.sample_name}\n",
-            self.process,
-        )
-        self.process.stdin.flush()
-        time.sleep(1)
-        self.process.stdin.write(b"gemurec\n")
-        self.process.stdin.flush()
+    def _launch_commands(self):
+        self.gemu_instance.write_to_qemu_console(b"gemurec\n")
         print("starting...")
-        guest_type(f"start {user}Desktop\\{self.sample_name}", self.process)
-        guest_type("\n", self.process)
+        for command in self.recipe.commands:
+            self.gemu_instance.type_into_guest(command+"\n")
+            time.sleep(1)
+        print("launched commands")
 
-    def try_to_free_image(self):
-        lock_found, qemu_pid = self.check_qcow_lock()
-        while lock_found:
-            self.kill_qemu_process(qemu_pid)
-            print("checking lock again")
-            lock_found, qemu_pid = self.check_qcow_lock()
-        print("No QEMU process holding write lock on", self.vm_config.image, "found.")
+    def _start_decorators(self):
+        for decorator in self._decorators:
+            decorator.start()
 
-    def check_qcow_lock(self):
-        try:
-            output = subprocess.check_output(["lsof", "-F", "npk", self.vm_config.image])
-            print(output)
-            lines = output.decode().split("\n")
-            pid = None
-            locked = False
-            for line in lines:
-                if line.startswith("p"):
-                    pid = line[1:]
-                elif line.startswith("k") and "1" in line[1:]:  # Check if locked
-                    locked = True
-            return locked, pid
-        except subprocess.CalledProcessError:
-            return False, None
+    def _join_decorators(self) -> dict[str, str]:
+        return_states = dict()
+        for decorator in self._decorators:
+            decorator.stop()
+            return_states[type(decorator).__name__] = decorator.return_code
+        return return_states
 
-    def kill_qemu_process(self, pid):
-        try:
-            subprocess.run(["kill", "-9", pid], check=True)
-            print("QEMU process with PID", pid, "has been terminated. Sleeping for 5 seconds")
-            time.sleep(5)
-        except subprocess.CalledProcessError:
-            print("Failed to terminate QEMU process with PID", pid)
+    def run_sample(self):
+        self._start_decorators()
+        with self.gemu_instance.launch_gemu(self.gemu_cmd):
+            print("launching gemu")
+            with self._mount_samples():
+                self._launch_commands()
+                self.gemu_instance.wait(timeout=self.recording_time)
+        self.gemu_instance.log_return_status(self._join_decorators())

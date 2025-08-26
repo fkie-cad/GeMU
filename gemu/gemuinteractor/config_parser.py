@@ -15,8 +15,8 @@ class VMConfig:
     apidoc: Path
     syscalltable: Path
 
-def get_vm_settings(name):
-    vm_settings = getattr(gemuinteractor.config, name)
+def get_vm_settings(name: str, file=gemuinteractor.config) -> VMConfig:
+    vm_settings = getattr(file, name)
     return VMConfig(
         Path(vm_settings["VM_IMAGE_PATH"]),
         vm_settings["SNAPSHOT"],
@@ -29,5 +29,5 @@ def get_vm_settings(name):
     )
 
 SAMPLE_NAME = "ahsofi.exe"
-GEMU_FOLDER = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-GEMU_PATH = os.path.join(GEMU_FOLDER, "build", "qemu-system-x86_64")
+GEMU_FOLDER = Path(__file__).absolute().parents[2]
+GEMU_PATH = GEMU_FOLDER / "build" / "qemu-system-x86_64"

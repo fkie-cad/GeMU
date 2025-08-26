@@ -41,24 +41,24 @@ unsigned char get_shellcode_byte(int offset){{
 TEST_FOLDER = Path(__file__).parent
 
 #requires nasm
-def assemble_shellcode():
+def assemble_shellcode() -> str:
     asm_file = TEST_FOLDER/"shellcode32.asm"
     output_path = TEST_FOLDER/"shellcode32"
-    command = f"nasm -o {output_path.as_posix()} {asm_file.as_posix()}"
-    result = subprocess.run(command, shell=True, cwd=TEST_FOLDER.as_posix())
+    command = f"nasm -o {output_path} {asm_file}"
+    result = subprocess.run(command, shell=True, cwd=str(TEST_FOLDER))
     assert result.returncode == 0
-    return output_path.as_posix()
+    return str(output_path)
 
-def encrypt_shellcode(shellcode, key):
+def encrypt_shellcode(shellcode: bytes, key: bytes) -> bytes:
     return bytes([b ^ k for (b,k) in zip(shellcode, key)])
 
 def generate_yara_rule(shellcode32, shellcode64):
     rule_str = f"rule shellcode32 {{strings: $hex = {{ {shellcode32.hex(" ")} }} condition: $hex }}"
     rule_str += f"rule shellcode64 {{strings: $hex = {{ {shellcode64.hex(" ")} }} condition: $hex }}"
     rule = yara.compile(source=rule_str)
-    rule.save((TEST_FOLDER/"shellcode.yarc").as_posix())
+    rule.save(str(TEST_FOLDER/"shellcode.yarc"))
 
-def generate_shellcode_c_file(shellcode32, shellcode64):
+def generate_shellcode_c_file(shellcode32: bytes, shellcode64: bytes):
     key = randbytes(max(len(shellcode32), len(shellcode64)))
     shellcode32 = encrypt_shellcode(shellcode32, key)
     shellcode64 = encrypt_shellcode(shellcode64, key)
@@ -69,15 +69,13 @@ def generate_shellcode_c_file(shellcode32, shellcode64):
     source = program_template.format(formated_shellcode64, formated_shellcode32, formated_key)
 
     c_file = TEST_FOLDER/"encrypted_shellcode.c"
-    with open(c_file, "w") as file:
-        file.write(source)
+    c_file.write_text(source)
 
-def get_shellcode(bitness):
+def get_shellcode(bitness: int) -> bytes:
     # # shellcode = "\x31\xc0\x50\x68\x65\x73\x73\x61\x68\x4d\x65\x73\x73\x89\xe1\x50\x68\x6f\x78\x41\x41\x68\x4d\x65\x73\x73\x68\x41\x41\x41\x41\x89\xe1\x50\x51\x53\xb8\xea\x07\x45\x7e\xff\xd0";
     # shellcode_file = assemble_shellcode()
     shellcode_file = Path(__file__).parent / f"ShellcodeTemplate.x{86 if bitness==32 else 64}.bin"
-    with open(shellcode_file, "rb") as file:
-        shellcode = file.read()
+    shellcode = shellcode_file.read_bytes()
     seed(0xdeadbeef)
     shellcode += b"testgemu"+randbytes(128)
     return shellcode

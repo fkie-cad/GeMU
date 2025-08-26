@@ -1,0 +1,5 @@
+samples:
+  - $INPUTBINARY:$USER\Desktop\$SAMPLE_NAME
+
+cmds:
+  - start $USER\Desktop\$SAMPLE_NAME
