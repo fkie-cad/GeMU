@@ -1,0 +1,8 @@
+samples:
+  - $INPUTBINARY:$USER\Desktop\msiahsofi.msi
+
+cmds:
+  - msiexec.exe /i $USERDesktop\\msiahsofi.msi
+
+overwriteinitprocess:
+  msiexec.exe
