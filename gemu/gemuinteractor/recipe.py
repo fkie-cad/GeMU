@@ -36,18 +36,18 @@ class Recipe:
 
     def _get_recipe_dict(self, sample: Path|str, export: str|None) -> dict:
         filetype = subprocess.check_output(["file", "-b", sample]).decode("utf-8")
-        if "PE" in filetype:
+        if filetype.startswith("PE32"):
             if export:
-                if "PE32+" in filetype: # 64bit Library
+                if filetype.startswith("PE32+"): # 64bit Library
                     return self.parse_yaml(RECIPE_FOLDER / "single_library_with_export_64bit.yml")
                 else:  # 32bit Library
                     return self.parse_yaml(RECIPE_FOLDER / "single_library_with_export_32bit.yml")
             else:
                 return self.parse_yaml(RECIPE_FOLDER / "single_native_binary.yml")
+        elif filetype.startswith("MS Windows shortcut"):
+            return self.parse_yaml(RECIPE_FOLDER / "single_lnk_file.yml")
         elif "MSI Installer" in filetype:
             return self.parse_yaml(RECIPE_FOLDER / "single_msi_file.yml")
-        elif "MS Windows shortcut" in filetype:
-            return self.parse_yaml(RECIPE_FOLDER / "single_lnk_file.yml")
         raise NotImplementedError
 
     @staticmethod
