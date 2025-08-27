@@ -2,7 +2,7 @@ samples:
   - $INPUTBINARY:$USER\Desktop\msiahsofi.msi
 
 cmds:
-  - msiexec.exe /i $USERDesktop\\msiahsofi.msi
+  - msiexec.exe /i $USER\Desktop\msiahsofi.msi
 
 overwriteinitprocess:
   msiexec.exe
