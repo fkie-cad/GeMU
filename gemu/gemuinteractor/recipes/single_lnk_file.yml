@@ -1,0 +1,8 @@
+samples:
+  - $INPUTBINARY:$USER\Desktop\ahsofilnk.lnk
+
+cmds:
+  - start $USER\Desktop\ahsofilnk.lnk
+
+overwriteinitprocess:
+  cmd.exe

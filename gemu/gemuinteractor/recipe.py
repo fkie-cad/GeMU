@@ -46,6 +46,8 @@ class Recipe:
                 return self.parse_yaml(RECIPE_FOLDER / "single_native_binary.yml")
         elif "MSI Installer" in filetype:
             return self.parse_yaml(RECIPE_FOLDER / "single_msi_file.yml")
+        elif "MS Windows shortcut" in filetype:
+            return self.parse_yaml(RECIPE_FOLDER / "single_lnk_file.yml")
         raise NotImplementedError
 
     @staticmethod
