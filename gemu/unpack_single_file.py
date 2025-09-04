@@ -17,21 +17,8 @@ def unpack_single_file(
     dotnet: str|None = None,
     trackingmode: str|None = None,
     recipe: Path|str|None = None,
-    tracing: bool = False
+    tracing: bool = False,
 ) -> AnalysisFolder:
-    """Main execution function for GEMU analysis.
-    
-    Args:
-        sample: Path to the sample to be executed
-        config: VM configuration name
-        time: Recording time in seconds
-        runname: Name of the analysis run
-        export: PE file export to launch
-        yararules: Path to compiled YARA rules for early exit
-        dotnet: .NET tracking mode (on|off|auto)
-        trackingmode: WinAPI tracking mode (syscall|basicblock|both)
-        recipe: Path to specific recipe file
-    """
     vm_config = get_vm_settings(config)
     
     recipe_obj = Recipe(user=vm_config.user, input_binary=sample, export=export or "", recipe=recipe)

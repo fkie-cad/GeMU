@@ -217,7 +217,7 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb, bool is_chained
     printf("processid %llu, threadid %llu\n", processid, threadid);
 
     target_ulong rip = cpu->env_ptr->eip;
-    WinThread* thread = get_win_thread(process, threadid);
+    WinThread* thread = wi_current_thread(process, threadid);
 
     if (!is_chained) {
         if (thread->length_last_bb == tb->size && thread->base_last_bb == rip) {
@@ -233,12 +233,12 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb, bool is_chained
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, process, CB_BEFORE_TB_EXEC);
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, process, EXIT_FROM_API);
 
-    printf("%llu:E,0x%lx,%i\n", process->ID, cpu->env_ptr->eip, tb->size);
     return;
 }
 
 
 void gemu_cb_tracing(CPUState *cpu, TranslationBlock *tb, bool is_chained){
+    // There should be no double basic blocks since this is called behind the execution
     if (cpu == NULL || tb == NULL || in_kernel_mode(cpu) ) {
         return;
     }
@@ -320,9 +320,9 @@ void gemu_cb_sysret(CPUX86State *cpu)
 
     QWORD pid, tid;
     get_current_pid_and_tid(cpu_new, &pid, &tid, process);
-    WinThread* current_thread = get_win_thread(process, tid);
-    syscall_hook_t* return_hook = current_thread->syscall_return_hook;
-    if(return_hook == NULL || return_hook->active == false){
+    WinThread* current_thread = wi_current_thread(process, tid);
+    syscall_hook_t* return_hook = &current_thread->syscall_return_hook;
+    if(return_hook->active == false){
         // sysret without hooked syscall
         return;
     }
@@ -335,18 +335,12 @@ void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb)
     if (cpu == NULL || tb == NULL || in_kernel_mode(cpu) ) {
         return;
     }
-
     Gemu *gemu_instance = gemu_get_instance();
     WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu, true);
     if (process == NULL) {
         // Exit early if the current program is not the one we want to watch
         return;
     }
-
-    QWORD processid;
-    QWORD threadid;
-    get_current_pid_and_tid(cpu, &processid, &threadid, process);
-
     check_for_unpacking(cpu, tb, process, gemu_instance);
 }
 

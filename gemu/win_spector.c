@@ -14,8 +14,6 @@
 
 struct timespec *start_time = NULL;
 
-target_ulong csbasecache = 0;
-
 static bool WinProcess_cmp(const void *a, const void *b) {
   WinProcess *wa = (WinProcess *)a;
   WinProcess *wb = (WinProcess *)b;
@@ -200,15 +198,11 @@ void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid, W
   *threadid = teb.ClientId.ThreadId;
 }
 
-WinThread *get_win_thread(WinProcess *process, QWORD tid) {
+WinThread *wi_current_thread(WinProcess *process, QWORD tid) {
     WinThread *thread = g_hash_table_lookup(process->threads_by_tid, GINT_TO_POINTER(tid));
     if (!thread) {
         thread = malloc(sizeof(WinThread));
-        if (!thread) {
-            // Whatever happens in this case
-            return NULL;
-        }
-        thread->syscall_return_hook = NULL;
+        thread->syscall_return_hook.active = false;
         thread->base_last_bb = 0;
         thread->length_last_bb = 0;
         g_hash_table_insert(process->threads_by_tid, GINT_TO_POINTER(tid), thread);

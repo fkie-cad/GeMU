@@ -104,7 +104,7 @@ typedef struct
 } WinProcess;
 
 typedef struct {
-    syscall_hook_t* syscall_return_hook;
+    syscall_hook_t syscall_return_hook;
     target_ulong base_last_bb;
     uint16_t length_last_bb;
 } WinThread;
@@ -142,6 +142,6 @@ bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p);
 
 struct qht *init_asid_WinProcess_map(int bucket_size);
 
-WinThread *get_win_thread(WinProcess *process, QWORD tid);
+WinThread *wi_current_thread(WinProcess *process, QWORD tid);
 
 #endif //GEMU_WIN_SPECTOR_HPP

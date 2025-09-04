@@ -97,26 +97,26 @@ class TestGemuRunnerSingleFile:
     def mock_gemu_instance(self):
         return GemuInstanceMock()
 
-    def gemu_single_file_runner(self, gemu_instance, recipe):
+    def gemu_single_file_runner(self, gemu_instance, recipe, tracing=False):
         vm_config = self.get_mock_vm_config()
         with patch('datetime.datetime') as mock_datetime:
             mock_now = mock_datetime.now.return_value
             mock_now.strftime.return_value = TIMESTAMP
-            return GemuRunner(UNPACKING_TIME, TRACKINGMODE, DOTNET, vm_config, recipe, gemu_instance)
+            return GemuRunner(UNPACKING_TIME, TRACKINGMODE, DOTNET, vm_config, recipe, gemu_instance, tracing=tracing)
 
     def test_command_without_export(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
         sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
         mock_gemu_instance = self.mock_gemu_instance()
         recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
-        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe, tracing=True)
 
         gemu_runner.run_sample()
 
-        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
-                                          f"-loadvm {SNAPSHOT} -symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
-                                          f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} "
-                                          f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} {IMAGE_PATH}")
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest -trackingmode {TRACKINGMODE} "
+                                                    f"-dotnet {DOTNET} -gemutracing -loadvm {SNAPSHOT} -symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
+                                                    f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} "
+                                                    f"{IMAGE_PATH}")
         assert mock_gemu_instance.waited == UNPACKING_TIME
 
     def test_command_with_export(self, tmpdir):
@@ -130,9 +130,10 @@ class TestGemuRunnerSingleFile:
         gemu_runner.run_sample()
 
         assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
-                                          f"-loadvm {SNAPSHOT} -symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
-                                          f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} "
-                                          f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} {IMAGE_PATH}")
+                                                    f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET}  -loadvm {SNAPSHOT} "
+                                                    f"-symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
+                                                    f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE}"
+                                                    f" {IMAGE_PATH}")
 
     def test_with_one_decorator(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
