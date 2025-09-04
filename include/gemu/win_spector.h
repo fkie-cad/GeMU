@@ -100,7 +100,7 @@ typedef struct
     void* current_modules;
     Bitness bitness;
     void* threads_by_tid;
-    target_ulong gsbase;
+    target_ulong gsbase; // cache this register value, because it can be zero sometimes
 } WinProcess;
 
 typedef struct {
