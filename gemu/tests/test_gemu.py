@@ -14,6 +14,7 @@ from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.config_parser import GEMU_PATH, get_vm_settings
 from tests.generate_shellcode import generate_shellcode_main
 from tests.test_gemu_runner_single_file import SMALL_BITNESS_PE
+import re
 
 compilers = {32: "i686-w64-mingw32-gcc", 64: "x86_64-w64-mingw32-gcc"}
 
@@ -77,25 +78,21 @@ SHELLCODE_TEST_NAMES = (
 
 @pytest.mark.parametrize("test_name,bitness,trackingmode", product(SHELLCODE_TEST_NAMES, (32,64), ("syscall", "basicblock")))
 def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmode):
-
-    if trackingmode == "basicblock" and test_name == "writefile":
-        pytest.skip(reason="known issue with bb tracking")
-
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
     yararules = (TEST_FOLDER/"shellcode.yarc")
 
     analysis_folder = unpack_single_file(
         sample=sample_path,
         config="win10",
-        time=120,
+        time=60,
         runname=f"gemutest-{trackingmode}",
         yararules=yararules,
         trackingmode=trackingmode,
-        dotnet="off"
+        dotnet="off",
     )
     assert "match" in analysis_folder.runlog.read_text().split("\n")[-4]
-    
     assert not analysis_folder.dumps_folder.exists()
+
 
 def test_timeout(tmpdir):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
@@ -129,3 +126,28 @@ def test_qcow_is_released_from_first_instance(tmpdir):
     assert "PROCESS RETURN CODE: 137" in analysis_folder.runlog.read_text()
     assert "BrokenPipeError: [Errno 32] Broken pipe" in analysis_folder.runlog.read_text()
     assert "REASON FOR GEMU EXIT: timeout" in analysis_folder2.runlog.read_text()
+
+def test_tracing_works(compiled_tests_folder):
+    sample_path = compile_test(compiled_tests_folder, "injection", 32)
+    yararules = (TEST_FOLDER/"shellcode.yarc")
+
+    analysis_folder = unpack_single_file(
+        sample=sample_path,
+        config="win10",
+        time=10,
+        runname=f"gemutest-syscall",
+        yararules=yararules,
+        trackingmode="syscall",
+        dotnet="off",
+        tracing=True,
+)
+
+    assert_regular_expression_matches_on_file(analysis_folder.runlog,
+                                              re.compile(r"^B:[0-9]*:[0-9]*:0x[0-9a-f]*,[0-9]*"))
+
+def assert_regular_expression_matches_on_file(file_path: Path, regex: str):
+    for line in file_path.open("r"):
+        if regex.search(line):
+            assert True
+            return
+    assert False

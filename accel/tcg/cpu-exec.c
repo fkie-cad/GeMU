@@ -48,6 +48,7 @@
 /* -icount align implementation. */
 extern bool gemu_use_exec;
 extern bool gemu_use_translation;
+extern bool gemu_use_tracing;
 
 typedef struct SyncClocks {
     int64_t diff_clk;
@@ -435,7 +436,10 @@ const void *HELPER(lookup_tb_ptr)(CPUArchState *env)
     }
 
     if (gemu_use_exec)
-        gemu_cb_before_tb_exec(cpu, tb);
+        gemu_cb_before_tb_exec(cpu, tb, true);
+
+    if (gemu_use_tracing)
+        gemu_cb_tracing(cpu, tb, true);
     return tb->tc.ptr;
 }
 
@@ -458,11 +462,15 @@ cpu_tb_exec(CPUState *cpu, TranslationBlock *itb, int *tb_exit)
     const void *tb_ptr = itb->tc.ptr;
 
     if (gemu_use_exec)
-        gemu_cb_before_tb_exec(cpu, itb);
+        gemu_cb_before_tb_exec(cpu, itb, false);
+
 
     if (qemu_loglevel_mask(CPU_LOG_TB_CPU | CPU_LOG_EXEC)) {
         log_cpu_exec(log_pc(cpu, itb), cpu, itb);
     }
+
+    if (gemu_use_tracing)
+        gemu_cb_tracing(cpu, itb, false);
 
     qemu_thread_jit_execute();
     ret = tcg_qemu_tb_exec(env, tb_ptr);

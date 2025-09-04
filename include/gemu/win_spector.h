@@ -99,9 +99,15 @@ typedef struct
     struct Node* cache_section_written;
     void* current_modules;
     Bitness bitness;
-    void* syscall_return_hooks_by_tid;
-    //syscall_hook_t syscall_return_hook;
+    void* threads_by_tid;
+    target_ulong gsbase; // cache this register value, because it can be zero sometimes
 } WinProcess;
+
+typedef struct {
+    syscall_hook_t syscall_return_hook;
+    target_ulong base_last_bb;
+    uint16_t length_last_bb;
+} WinThread;
 
 typedef struct
 {
@@ -126,7 +132,7 @@ WinProcess *wi_extract_process_from_memory_with_env(WindowsIntrospecter *w, CPUA
 
 WinProcess *get_WinProcess_for_pid(WindowsIntrospecter *w, target_ulong id);
 
-void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid);
+void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid, WinProcess *process);
 
 void get_pid_and_tid_from_teb_address(target_ulong teb_address, CPUState *cpu, QWORD *processid, QWORD *threadid);
 
@@ -135,5 +141,7 @@ void print_memory_map(CPUState *cpu, WinProcess *thread);
 bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p);
 
 struct qht *init_asid_WinProcess_map(int bucket_size);
+
+WinThread *wi_current_thread(WinProcess *process, QWORD tid);
 
 #endif //GEMU_WIN_SPECTOR_HPP

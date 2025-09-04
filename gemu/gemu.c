@@ -945,21 +945,21 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
 
 
     QWORD pid, tid;
-    get_current_pid_and_tid(cpu, &pid, &tid);
-    syscall_hook_t* newHook_ptr = g_hash_table_lookup(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid));
-    if(newHook_ptr == NULL){
-        newHook_ptr = malloc(sizeof(syscall_hook_t));
-        g_hash_table_insert(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid), newHook_ptr);
+    get_current_pid_and_tid(cpu, &pid, &tid, process);
+    WinThread* current_thread = wi_current_thread(process, tid);
+    syscall_hook_t* hook_ptr = &current_thread->syscall_return_hook;
+    if (hook_ptr->active) {
+        printf("ALARM: SYSCALLS DO NOT WORK AS WE THOUGHT THEY DID!\n");
+        printf("IF YOU SEE THIS MESSAGE PLEASE REPORT IT TO THE DEVELOPERS\n");
     }
-    newHook_ptr->active = true;
-    newHook_ptr->out_parameter_list.number_of_outparameters = -2;
-    newHook_ptr->syscall_enum = syscall;
-    // *newHook_ptr->func_name = "";
+    hook_ptr->active = true;
+    hook_ptr->out_parameter_list.number_of_outparameters = -2;
+    hook_ptr->syscall_enum = syscall;
     const char *dll_name = "syscall";
 
     const char* func_name = SYSCALL_NAMES[syscall];
 
-    handle_special_syscall_apis_enum(gemu_instance, cpu, dll_name, syscall, process, newHook_ptr, is32bit);
+    handle_special_syscall_apis_enum(gemu_instance, cpu, dll_name, syscall, process, hook_ptr, is32bit);
 
     cJSON *output;
     if (is32bit) {
@@ -967,13 +967,13 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
         gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP],
                                 (uint8_t * ) & ret_addr, 4, false);
         output =
-                read_parameters32(gemu_instance, cpu, func_name, dll_name, &newHook_ptr->out_parameter_list, process);
+                read_parameters32(gemu_instance, cpu, func_name, dll_name, &hook_ptr->out_parameter_list, process);
     } else {
         QWORD ret_addr;
         gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP],
                                 (uint8_t * ) & ret_addr, 8, false);
         output =
-                read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook_ptr->out_parameter_list, process);
+                read_parameters64(gemu_instance, cpu, func_name, dll_name, &hook_ptr->out_parameter_list, process);
     }
 
     printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));

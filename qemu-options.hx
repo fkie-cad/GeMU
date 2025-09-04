@@ -5650,6 +5650,14 @@ SRST
     'auto' will enable bb breaks as soon as dotnet software is detected. If bb breaks are already enabled, this defaults to 'on'.
 ERST
 
+DEF("gemutracing", 0, QEMU_OPTION_gemutracing, \
+"-gemutracing    Activate the basic block tracing of GeMU.\n", QEMU_ARCH_ALL)
+SRST
+``-gemutracing``
+    Activate the tracing mode of GeMU.
+    It causes GeMU to print a line per each executed basic block in the infected processes.
+ERST
+
 HXCOMM This is the last statement. Insert new options before this line!
 
 #undef DEF

@@ -14,6 +14,7 @@ bool gemu_use_memcb = false;
 bool gemu_use_exec = false;
 bool gemu_use_translation = false;
 bool gemu_use_syscall = true;
+bool gemu_use_tracing = false;
  // This should be set to true by default. This will make it impossible to miss compilation in case setup is delayed.
 bool gemu_compile_syscall_helper = true;
 int counter = 0;
@@ -191,7 +192,7 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
     }
 }
 
-void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb)
+void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb, bool is_chained)
 {
 
     if (cpu == NULL || tb == NULL || in_kernel_mode(cpu)) {
@@ -210,13 +211,50 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb)
         // Exit early if the current program is not the one we want to watch
         return;
     }
+    QWORD processid;
+    QWORD threadid;
+    get_current_pid_and_tid(cpu, &processid, &threadid, process);
+    printf("processid %llu, threadid %llu\n", processid, threadid);
 
     target_ulong rip = cpu->env_ptr->eip;
+    WinThread* thread = wi_current_thread(process, threadid);
+
+    if (!is_chained) {
+        if (thread->length_last_bb == tb->size && thread->base_last_bb == rip) {
+            printf("skipping duplicate BB for %llu:%llu:0x%lx,%i\n", process->ID, threadid, rip, tb->size);
+            return;
+        }
+    }
+
+    thread->length_last_bb = tb->size;
+    thread->base_last_bb = rip;
+
+
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, process, CB_BEFORE_TB_EXEC);
     hkr_try_exec_hook(gemu_instance->hooker, rip, cpu, tb, process, EXIT_FROM_API);
 
-    // printf("%llu:E,0x%lx,%i\n", process->ID, cpu->env_ptr->eip, tb->size);
     return;
+}
+
+
+void gemu_cb_tracing(CPUState *cpu, TranslationBlock *tb, bool is_chained){
+    // There should be no double basic blocks since this is called behind the execution
+    if (cpu == NULL || tb == NULL || in_kernel_mode(cpu) ) {
+        return;
+    }
+
+    Gemu *gemu_instance = gemu_get_instance();
+    WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu, true);
+    if (process == NULL) {
+        // Exit early if the current program is not the one we want to watch
+        return;
+    }
+
+    QWORD processid;
+    QWORD threadid;
+    get_current_pid_and_tid(cpu, &processid, &threadid, process);
+
+    printf("B:%llu:%llu:0x%lx,%i\n", processid, threadid, cpu->env_ptr->eip, tb->size);
 }
 
 
@@ -258,6 +296,7 @@ void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend)
     const char* funcname2 = SYSCALL_NAMES[syscall_enum];
     
     printf("SYSCALL: %lx %s\n", cpu->regs[R_EAX], funcname2);
+    //print_module_nodes(process->current_modules);
     pipe_logger_before_syscall_exec_enum(cpu_new, syscall_enum, process);
 
     //printf("%llu:E,0x%lx,%i\n", thread->Process.ID, cpu->env_ptr->eip, tb->size);
@@ -280,9 +319,10 @@ void gemu_cb_sysret(CPUX86State *cpu)
     }
 
     QWORD pid, tid;
-    get_current_pid_and_tid(cpu_new, &pid, &tid);
-    syscall_hook_t* return_hook = g_hash_table_lookup(process->syscall_return_hooks_by_tid, GINT_TO_POINTER(tid));
-    if(return_hook == NULL || return_hook->active == false){
+    get_current_pid_and_tid(cpu_new, &pid, &tid, process);
+    WinThread* current_thread = wi_current_thread(process, tid);
+    syscall_hook_t* return_hook = &current_thread->syscall_return_hook;
+    if(return_hook->active == false){
         // sysret without hooked syscall
         return;
     }
@@ -295,23 +335,14 @@ void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb)
     if (cpu == NULL || tb == NULL || in_kernel_mode(cpu) ) {
         return;
     }
-
     Gemu *gemu_instance = gemu_get_instance();
     WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu, true);
     if (process == NULL) {
         // Exit early if the current program is not the one we want to watch
         return;
     }
-
-    //QWORD processid;
-    //QWORD threadid;
-    //get_current_pid_and_tid(cpu, &processid, &threadid);
-    //printf("%llu:%llu:B:0x%lx,%i\n", process->ID, threadid, cpu->env_ptr->eip, tb->size);
-    //printf("%llu:B:0x%lx,%i\n", process->ID, cpu->env_ptr->eip, tb->size);
-
     check_for_unpacking(cpu, tb, process, gemu_instance);
 }
-
 
 
 void gemu_cb_phys_memory_written(CPUArchState *env, target_ulong addr, uint64_t val, size_t size, uintptr_t retaddr)

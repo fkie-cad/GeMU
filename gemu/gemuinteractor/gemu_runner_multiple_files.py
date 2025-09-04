@@ -84,7 +84,7 @@ class GemuRunnerMultipleFiles:
         try:
             print(self._trackingmode, self._dotnet, self._yararules)
             call = [
-                "python3", "unpack_single_file.py",
+                "python3", str(Path(__file__).parents[1] / "unpack_single_file.py"),
                 "--sample", str(path),
                 "--time", str(self._time),
                 "--runname", self._runname,
