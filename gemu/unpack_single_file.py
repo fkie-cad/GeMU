@@ -83,7 +83,7 @@ def cli_main() -> None:
         dotnet=args.dotnet,
         trackingmode=args.trackingmode,
         recipe=args.recipe,
-        tracing=args.tracing
+        tracing=args.tracing,
     )
 
 
