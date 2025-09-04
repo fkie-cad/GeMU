@@ -32,7 +32,7 @@ def unpack_single_file(
         vm_config=vm_config,
         gemu_instance=gemu_instance,
         recipe=recipe_obj,
-        tracing=tracing
+        tracing=tracing,
     )
     
     decorators: list[RunDecorator] = [WrittenFileMerger(sleep=2, gemu_instance=gemu_instance)]
