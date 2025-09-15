@@ -1,8 +1,12 @@
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import sys
 
-import gemuinteractor.config
+try:
+    import gemuinteractor.config as config_file
+except ImportError as e:
+    sys.exit("Config file not found!\nPlease set up gemu/gemuinteractor/config.py based on the template.")
 
 @dataclass
 class VMConfig:
@@ -15,7 +19,7 @@ class VMConfig:
     apidoc: Path
     syscalltable: Path
 
-def get_vm_settings(name: str, file=gemuinteractor.config) -> VMConfig:
+def get_vm_settings(name: str, file=config_file) -> VMConfig:
     vm_settings = getattr(file, name)
     return VMConfig(
         Path(vm_settings["VM_IMAGE_PATH"]),
@@ -27,6 +31,10 @@ def get_vm_settings(name: str, file=gemuinteractor.config) -> VMConfig:
         Path(vm_settings["APIDOC"]),
         Path(vm_settings["SYSCALLTABLE"]),
     )
+
+def get_vm_pool(name: str, file=config_file) -> list[str]:
+    vm_pool = getattr(file, name)
+    return vm_pool
 
 SAMPLE_NAME = "ahsofi.exe"
 GEMU_FOLDER = Path(__file__).absolute().parents[2]

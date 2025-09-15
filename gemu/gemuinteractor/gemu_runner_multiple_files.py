@@ -6,7 +6,7 @@ from typing import Iterable
 
 from gemuinteractor.scheduler import Scheduler
 
-import gemuinteractor.config
+from gemuinteractor.config_parser import get_vm_pool
 
 FORBIDDEN = [".log", ".txt", "dump", "pandalog", "dmp7", "dumps", "elf", "pandalog", "unpacked"]
 
@@ -24,7 +24,7 @@ class GemuRunnerMultipleFiles:
         self._allowmultipleruns = allowmultipleruns
 
     def run(self):
-        scheduler = Scheduler(self._executeAnalysisLive, getattr(gemuinteractor.config, self._configs))
+        scheduler = Scheduler(self._executeAnalysisLive, get_vm_pool(self._configs))
         scheduler.process_samples(self.get_samples())
 
     def get_samples(self) -> Iterable[Path]:
