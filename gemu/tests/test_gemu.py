@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from gemu.unpack_single_file import unpack_single_file
+from unpack_single_file import unpack_single_file
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
 from gemuinteractor.recipe import Recipe
 from gemuinteractor.gemu_runner_single_file import GemuRunner

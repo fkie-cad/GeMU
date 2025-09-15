@@ -1,12 +1,15 @@
 from dataclasses import dataclass
-import os
 from pathlib import Path
 import sys
+import importlib
 
-try:
-    import gemuinteractor.config as config_file
-except ImportError as e:
-    sys.exit("Config file not found!\nPlease set up gemu/gemuinteractor/config.py based on the template.")
+def load_config_file(module_name="gemuinteractor.config"):
+    try:
+        loaded_config = importlib.import_module(module_name)
+    except ImportError as e:
+        sys.exit(f"Config file not found!\nPlease set up gemu/{module_name.replace('.', '/')}.py based on the template.")
+        return None
+    return loaded_config
 
 @dataclass
 class VMConfig:
@@ -19,7 +22,9 @@ class VMConfig:
     apidoc: Path
     syscalltable: Path
 
-def get_vm_settings(name: str, file=config_file) -> VMConfig:
+def get_vm_settings(name: str, file=None) -> VMConfig:
+    if file is None:
+        file = load_config_file()
     vm_settings = getattr(file, name)
     return VMConfig(
         Path(vm_settings["VM_IMAGE_PATH"]),
@@ -32,7 +37,9 @@ def get_vm_settings(name: str, file=config_file) -> VMConfig:
         Path(vm_settings["SYSCALLTABLE"]),
     )
 
-def get_vm_pool(name: str, file=config_file) -> list[str]:
+def get_vm_pool(name: str, file=None) -> list[str]:
+    if file is None:
+        file = load_config_file()
     vm_pool = getattr(file, name)
     return vm_pool
 
