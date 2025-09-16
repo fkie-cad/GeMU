@@ -1,7 +1,7 @@
 import os
-import subprocess
 import tempfile
 import time
+import yara
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -26,9 +26,8 @@ def yara_rule_file():
 }
 '''
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(yara_content.encode())
-        temp_file.flush()
-        subprocess.check_output(["yarac", "-w", temp_file.name, temp_file.name])
+        rules = yara.compile(source=yara_content)
+        rules.save(temp_file.name)
         yield temp_file.name
     os.unlink(temp_file.name)
 
