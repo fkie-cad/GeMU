@@ -1,9 +1,12 @@
 from itertools import chain
 from pathlib import Path
 import shutil
+
+import pytest
 from tests.test_gemu_runner_single_file import SMALL_BITNESS_PE
 from gemuinteractor.gemu_runner_multiple_files import GemuRunnerMultipleFiles
 
+@pytest.mark.emulation
 def test_list(tmpdir):
     tmpdir = Path(tmpdir).absolute()
     file1 = shutil.copy(SMALL_BITNESS_PE, tmpdir/"file1.exe")
@@ -42,7 +45,7 @@ def test_list(tmpdir):
 
     assert num_folders == 2
 
-
+@pytest.mark.emulation
 def test_folder(tmpdir):
     tmpdir = Path(tmpdir).absolute()
     shutil.copy(SMALL_BITNESS_PE, tmpdir/"file1.exe")

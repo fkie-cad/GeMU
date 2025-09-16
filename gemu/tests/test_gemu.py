@@ -75,7 +75,7 @@ SHELLCODE_TEST_NAMES = (
     "writefile",
 )
 
-
+@pytest.mark.emulation
 @pytest.mark.parametrize("test_name,bitness,trackingmode", product(SHELLCODE_TEST_NAMES, (32,64), ("syscall", "basicblock")))
 def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmode):
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
@@ -94,6 +94,7 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmo
     assert not analysis_folder.dumps_folder.exists()
 
 
+@pytest.mark.emulation
 def test_timeout(tmpdir):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
     copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
@@ -105,6 +106,7 @@ def test_timeout(tmpdir):
     )
     assert "REASON FOR GEMU EXIT: timeout" in analysis_folder.runlog.read_text()
 
+@pytest.mark.emulation
 def test_qcow_is_released_from_first_instance(tmpdir):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
     copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
@@ -127,6 +129,7 @@ def test_qcow_is_released_from_first_instance(tmpdir):
     assert "BrokenPipeError: [Errno 32] Broken pipe" in analysis_folder.runlog.read_text()
     assert "REASON FOR GEMU EXIT: timeout" in analysis_folder2.runlog.read_text()
 
+@pytest.mark.emulation
 def test_tracing_works(compiled_tests_folder):
     sample_path = compile_test(compiled_tests_folder, "injection", 32)
     yararules = (TEST_FOLDER/"shellcode.yarc")
