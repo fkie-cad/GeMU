@@ -6,9 +6,8 @@ import importlib
 def load_config_file(module_name="gemuinteractor.config"):
     try:
         loaded_config = importlib.import_module(module_name)
-    except ImportError as e:
+    except ImportError:
         sys.exit(f"Config file not found!\nPlease set up gemu/{module_name.replace('.', '/')}.py based on the template.")
-        return None
     return loaded_config
 
 @dataclass
