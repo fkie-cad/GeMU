@@ -214,7 +214,6 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb, bool is_chained
     QWORD processid;
     QWORD threadid;
     get_current_pid_and_tid(cpu, &processid, &threadid, process);
-    printf("processid %llu, threadid %llu\n", processid, threadid);
 
     target_ulong rip = cpu->env_ptr->eip;
     WinThread* thread = wi_current_thread(process, threadid);
