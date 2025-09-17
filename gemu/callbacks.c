@@ -220,7 +220,7 @@ void gemu_cb_before_tb_exec(CPUState *cpu, TranslationBlock *tb, bool is_chained
 
     if (!is_chained) {
         if (thread->length_last_bb == tb->size && thread->base_last_bb == rip) {
-            printf("skipping duplicate BB for %llu:%llu:0x%lx,%i\n", process->ID, threadid, rip, tb->size);
+            // printf("skipping duplicate BB for %llu:%llu:0x%lx,%i\n", process->ID, threadid, rip, tb->size);
             return;
         }
     }
@@ -294,7 +294,7 @@ void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend)
     // char* funcname = lookup_syscall(gemu_instance, &process->Process, cpu->regs[R_EAX]);
     const char* funcname2 = SYSCALL_NAMES[syscall_enum];
     
-    printf("SYSCALL: %lx %s\n", cpu->regs[R_EAX], funcname2);
+    // printf("SYSCALL: %lx %s\n", cpu->regs[R_EAX], funcname2);
     //print_module_nodes(process->current_modules);
     pipe_logger_before_syscall_exec_enum(cpu_new, syscall_enum, process);
 

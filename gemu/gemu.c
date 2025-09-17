@@ -192,7 +192,7 @@ void fill_processinformation32(CPUState *cpu, QWORD value,
     PROCESS_INFORMATION32 process_info;
     gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
                             sizeof process_info, false);
-    printf("NEW PID: %i\n", process_info.dwProcessId);
+    // printf("NEW PID: %i\n", process_info.dwProcessId);
 
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(process_info.dwProcessId), NULL);
@@ -204,7 +204,7 @@ void fill_processinformation32(CPUState *cpu, QWORD value,
                             process_info.hProcess);
     cJSON_AddNumberToObject(processinformation, "hThread", process_info.hThread);
     g_hash_table_insert(process->process_handles, GINT_TO_POINTER((int)process_info.hProcess), GINT_TO_POINTER((int)process_info.dwProcessId));
-    printf("adding %u, %u to process handles\n", process_info.hProcess, process_info.dwProcessId);
+    // printf("adding %u, %u to process handles\n", process_info.hProcess, process_info.dwProcessId);
 }
 
 void fill_processinformation64(CPUState *cpu, QWORD value,
@@ -212,7 +212,7 @@ void fill_processinformation64(CPUState *cpu, QWORD value,
     PROCESS_INFORMATION64 process_info;
     gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
                             sizeof process_info, false);
-    printf("NEW PID: %i\n", process_info.dwProcessId);
+    // printf("NEW PID: %i\n", process_info.dwProcessId);
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(process_info.dwProcessId), NULL);
     cJSON_AddNumberToObject(processinformation, "ProcessId",
@@ -223,7 +223,7 @@ void fill_processinformation64(CPUState *cpu, QWORD value,
                             process_info.hProcess);
     cJSON_AddNumberToObject(processinformation, "hThread", process_info.hThread);
     g_hash_table_insert(process->process_handles, GINT_TO_POINTER(process_info.hProcess), GINT_TO_POINTER(process_info.dwProcessId));
-    printf("adding %llu, %u to process handles\n", process_info.hProcess, process_info.dwProcessId);
+    // printf("adding %llu, %u to process handles\n", process_info.hProcess, process_info.dwProcessId);
 }
 
 cJSON *read_parameters64(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
@@ -516,10 +516,10 @@ cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
 
 void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
     // {"func":"ZwOpenProcess","dll_name":"ntdll.dll","ProcessHandle":48,"ClientId":2796}
-    printf("insert %i and %i to handle dict of process %lli\n",
-           cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint,
-           cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint,
-           process->ID);
+    // printf("insert %i and %i to handle dict of process %lli\n",
+    //        cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint,
+    //        cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint,
+    //        process->ID);
     if (cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint > 0 &&
         cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint > 0) {
         g_hash_table_insert(
@@ -533,7 +533,7 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
 
 
 void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJSON* output) {
-    printf("I am in ZwMapViewOfSection\n");
+    // printf("I am in ZwMapViewOfSection\n");
     int sectionHandle = cJSON_GetObjectItemCaseSensitive(output, "SectionHandle")->valueint;
     int handle = cJSON_GetObjectItemCaseSensitive(output, "hProcess")->valueint;
     hwaddr remoteAddress = cJSON_GetObjectItemCaseSensitive(output, "remoteAddress")->valueint;
@@ -541,18 +541,18 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
     target_ulong pid = process->ID;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         pid = (target_ulong) g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle));
-        printf("ZwMapViewOfSection injection into PID %li\n", pid);
+        // printf("ZwMapViewOfSection injection into PID %li\n", pid);
         struct MappedRange* rangeptr = g_hash_table_lookup(process->section_handles, GINT_TO_POINTER(sectionHandle));
         if (rangeptr == NULL) {
-            printf("could not find the correct range for the handle therefore a shared state is not possible\n");
+            // printf("could not find the correct range for the handle therefore a shared state is not possible\n");
             addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, pid, remoteAddress, ViewSize, 0, 0, 0);
             printList(getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, pid));
         }
         else {
-            printf("I found the range in the other process :)\n");
+            // printf("I found the range in the other process :)\n");
             addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, pid, remoteAddress, ViewSize, process->ID, rangeptr->start, rangeptr->size);
             addMappedMemoryNodeToList(gemu_instance->mapped_sections_waitinglist, process->ID, rangeptr->start, rangeptr->size, pid, remoteAddress, ViewSize);
-            printf("i added the nodes to both lists\n");
+            // printf("i added the nodes to both lists\n");
         }
         return;
     }
@@ -562,14 +562,14 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
         struct MappedRange* rangeptr = (struct MappedRange*) malloc(sizeof(struct MappedRange));
         rangeptr->start = remoteAddress;
         rangeptr->size = ViewSize;
-        printf("inserting into process->section_handles\n");
+        // printf("inserting into process->section_handles\n");
         g_hash_table_insert(process->section_handles, GINT_TO_POINTER(sectionHandle), rangeptr);
-        printf("successfully inserted\n");
+        // printf("successfully inserted\n");
     }
 }
 
 static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *process, cJSON* output, CPUState* cpu) {
-    printf("I am in NtCreateUserProcess\n");
+    // printf("I am in NtCreateUserProcess\n");
     int pAttributeList = cJSON_GetObjectItemCaseSensitive(output, "AttributeList")->valueint;
     if(pAttributeList == 0){
         printf("Warning: Could not get PID from NtCreateUserProcess. AttributeList is NULL.\n");
@@ -591,7 +591,7 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
     }
 
     if (client_id.ProcessId == 0){
-        printf("Warning: Could not get PID from NtCreateUserProcess. AttributeList did not contain PID.\n");
+        // printf("Warning: Could not get PID from NtCreateUserProcess. AttributeList did not contain PID.\n");
         return;
     }
 
@@ -599,7 +599,7 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(client_id.ProcessId), NULL);
     g_hash_table_insert(process->process_handles, GINT_TO_POINTER((int)process_handle), GINT_TO_POINTER((int)client_id.ProcessId));
-    printf("adding %lu, %llu to process handles\n", process_handle, client_id.ProcessId);
+    // printf("adding %lu, %llu to process handles\n", process_handle, client_id.ProcessId);
 }
 
 void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_hook_t* hook) {
@@ -756,7 +756,7 @@ void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
     int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         int pid = GPOINTER_TO_INT(g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle)));
-        printf("found injection into PID %i\n", pid);
+        // printf("found injection into PID %i\n", pid);
         g_hash_table_insert(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(pid),
                             NULL);
         dump_WriteVirtualMemory(output, cpu, process, pid);
@@ -816,7 +816,7 @@ static void handle_NtOpenFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *pr
         return;
     }
 
-    printf("I'm in NtOpenFile\n");
+    // printf("I'm in NtOpenFile\n");
     OBJECT_ATTRIBUTES attributes;
     UNICODE_STRING object_name;
 
@@ -862,33 +862,31 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
     }
 
     if (strcmp(func_name, "ZwTerminateProcess") == 0) {
-        printf("handling a special API %s for ZwTerminateProcess\n", func_name);
+        // printf("handling a special API %s for ZwTerminateProcess\n", func_name);
         handle_ZwTerminateProcess(gemu_instance, cpu, process, dll_name, func_name,
                                   out_parameter_list, is32Bit);
         return true;
     }
     if (strcmp(func_name, "ZwOpenProcess") == 0) {
-        printf("handling a special API %s for ZwOpenProcess\n", func_name);
+        // printf("handling a special API %s for ZwOpenProcess\n", func_name);
         return true;
      }
     if (strcmp(func_name, "ZwWriteVirtualMemory") == 0) {
-        printf("handling a special API %s for ZwWriteVirtualMemory\n", func_name);
+        // printf("handling a special API %s for ZwWriteVirtualMemory\n", func_name);
         handle_ZwWriteVirtualMemory(gemu_instance, cpu, process, dll_name,
                                     func_name, out_parameter_list, is32Bit);
     }
     if (strcmp(func_name, "ZwAllocateVirtualMemory") == 0) {
-        printf("handling a special API %s for ZwAllocateVirtualMemory\n",
-               func_name);
+        // printf("handling a special API %s for ZwAllocateVirtualMemory\n", func_name);
         return true;
     }
     if (strcmp(func_name, "ZwWriteFile") == 0) {
-        printf("handling a special API %s for ZwWriteFile\n", func_name);
-        handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name, out_parameter_list,
-                           is32Bit);
+        // printf("handling a special API %s for ZwWriteFile\n", func_name);
+        handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name, out_parameter_list, is32Bit);
         return true;
     }
     if (strcmp(func_name, "ZwMapViewOfSection") == 0) {
-        printf("handling a special API %s for ZwMapViewOfSection\n", func_name);
+        // printf("handling a special API %s for ZwMapViewOfSection\n", func_name);
         return true;
     }
     return false;
@@ -900,37 +898,35 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
     const char* func_name = SYSCALL_NAMES[syscall];
     switch (syscall){
         case NtTerminateProcess: 
-            printf("handling a special API %s for NtTerminateProcess\n", func_name);
+            // printf("handling a special API %s for NtTerminateProcess\n", func_name);
             handle_ZwTerminateProcess(gemu_instance, cpu, process, dll_name, func_name,
                                     &hook->out_parameter_list, is32Bit);
             return true;
         case NtOpenProcess:
-            printf("handling a special API %s for NtOpenProcess\n", func_name);
+            // printf("handling a special API %s for NtOpenProcess\n", func_name);
             return true;
         case NtWriteVirtualMemory:
-            printf("handling a special API %s for NtWriteVirtualMemory\n", func_name);
+            // printf("handling a special API %s for NtWriteVirtualMemory\n", func_name);
             handle_ZwWriteVirtualMemory(gemu_instance, cpu, process, dll_name,
                                         func_name, &hook->out_parameter_list, is32Bit);
             return true;
         case NtAllocateVirtualMemory:
-            printf("handling a special API %s for NtAllocateVirtualMemory\n",
-                func_name);
+            // printf("handling a special API %s for NtAllocateVirtualMemory\n", func_name);
             return true;
         case NtWriteFile:
-            printf("handling a special API %s for NtWriteFile\n", func_name);
+            // printf("handling a special API %s for NtWriteFile\n", func_name);
             handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name, &hook->out_parameter_list,
                             is32Bit);
             return true;
         case NtMapViewOfSection:
-            printf("handling a special API %s for NtMapViewOfSection\n", func_name);
+            // printf("handling a special API %s for NtMapViewOfSection\n", func_name);
             return true;
         case NtCreateUserProcess:
-            printf("handling a special API %s for NtCreateUserProcess\n", func_name);
+            // printf("handling a special API %s for NtCreateUserProcess\n", func_name);
             return true;
         case NtOpenFile:
-            printf("handling a special API %s for NtOpenFile\n", func_name);
-            handle_NtOpenFile(gemu_instance, cpu, process, dll_name, func_name, &hook->out_parameter_list,
-                            is32Bit);
+            // printf("handling a special API %s for NtOpenFile\n", func_name);
+            handle_NtOpenFile(gemu_instance, cpu, process, dll_name, func_name, &hook->out_parameter_list, is32Bit);
             return true;
         default:
             return false;
@@ -1208,13 +1204,13 @@ void try_extract_kernel32_address(Gemu *gemu_instance, CPUState *cpu, WinProcess
     ModuleNode* current = process->current_modules;
     while (current != NULL) {
         if (strcmp(current->file,"c:\\windows\\syswow64\\kernelbase.dll") == 0){
-            printf("found kernel\n");
+            // printf("found kernel\n");
             gemu_instance->kernel32_32bit_found = true;
             handle_loaded_library(process->current_modules);
             return;
         }
         if (strcmp(current->file,"c:\\windows\\system32\\kernelbase.dll") == 0){
-            printf("found kernel\n");
+            // printf("found kernel\n");
             gemu_instance->kernel32_64bit_found = true;
             handle_loaded_library(process->current_modules);
             return;
@@ -1330,7 +1326,7 @@ void handle_loaded_library(ModuleNode *head) {
     while (current != NULL) {
         functions = g_hash_table_lookup(hash_table_modules, (gpointer)current->file);
         if (functions != NULL){
-            printf("FOUND %s BASE: 0x%llX\n", current->file, current->base);
+            // printf("FOUND %s BASE: 0x%llX\n", current->file, current->base);
             bool succ_symb_read = read_dynamic_symbols_txt(functions, current->base);
             if (!succ_symb_read) {
                 g_printerr("Error reading symbols file\n");

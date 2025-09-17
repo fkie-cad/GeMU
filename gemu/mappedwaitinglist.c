@@ -85,7 +85,7 @@ void addMappedMemoryNodeToList(GHashTable* hashMap, pid_t pid, hwaddr start, siz
 void printList(struct SingleLinkedList* list) {
     struct MappedMemoryNode* current = list->head;
     while (current != NULL) {
-        printf("MappedMemoryNode: Start Address = 0x%lx, Size = %zu\n", current->start, current->size);
+        // printf("MappedMemoryNode: Start Address = 0x%lx, Size = %zu\n", current->start, current->size);
         current = current->next;
     }
 }
