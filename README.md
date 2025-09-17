@@ -87,7 +87,7 @@ GeMU comes with two scripts to:
 - unpack single files
 - unpack multiple files
 
-Below are simple example uses of these three scripts.
+Below are simple example uses of these two scripts.
 To learn more about all available options and parameters, try the `--help` flag.
 
 Make sure you are in the right directory:
