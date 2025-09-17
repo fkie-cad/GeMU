@@ -83,10 +83,9 @@ $EDITOR config.py
 
 
 ## Usage
-GeMU comes with scripts to:
+GeMU comes with two scripts to:
 - unpack single files
 - unpack multiple files
-- unpack a file with a predifined "recipe"
 
 Below are simple example uses of these three scripts.
 To learn more about all available options and parameters, try the `--help` flag.
@@ -100,6 +99,8 @@ cd <gemu-repo-dir>/gemu
 ```bash
 python3 unpack_single_file.py --sample path/to/binary --time 60
 ```
+You can add support for new file types yourself by writing a custom GeMU Recipe and passing it via `--recipe <path>`.
+Examples of recipes can be found in `<gemu-repo-dir>/gemu/gemuinteractor/recipes`.
 
 
 ### Multiple Files
@@ -109,11 +110,6 @@ python3 unpack_multiple_file.py --samples samples_list.txt --yararules rules.yar
 python3 unpack_multiple_file.py --samples sample_folders_list.txt --allowduplicateruns
 ```
 
-### With Recipe 
-```bash
-python3 unpack_with_recipe.py --sampleyml recipe.yml
-```
-An example recipe can be found at `<gemu-repo-dir>/gemu/gemuinteractor/example.yml`.
 
 ## Roadmap
 - [x] per-thread matching of syscall/sysret pairs
