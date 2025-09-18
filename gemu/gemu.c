@@ -192,7 +192,7 @@ void fill_processinformation32(CPUState *cpu, QWORD value,
     PROCESS_INFORMATION32 process_info;
     gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
                             sizeof process_info, false);
-    // printf("NEW PID: %i\n", process_info.dwProcessId);
+    printf("NEW PID: %i\n", process_info.dwProcessId);
 
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(process_info.dwProcessId), NULL);
@@ -212,7 +212,7 @@ void fill_processinformation64(CPUState *cpu, QWORD value,
     PROCESS_INFORMATION64 process_info;
     gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
                             sizeof process_info, false);
-    // printf("NEW PID: %i\n", process_info.dwProcessId);
+    printf("NEW PID: %i\n", process_info.dwProcessId);
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(process_info.dwProcessId), NULL);
     cJSON_AddNumberToObject(processinformation, "ProcessId",
@@ -756,7 +756,7 @@ void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
     int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         int pid = GPOINTER_TO_INT(g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle)));
-        // printf("found injection into PID %i\n", pid);
+        printf("found injection into PID %i\n", pid);
         g_hash_table_insert(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(pid),
                             NULL);
         dump_WriteVirtualMemory(output, cpu, process, pid);
