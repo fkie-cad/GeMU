@@ -21,9 +21,9 @@ Citation: Jenke, T., Ufer, M., Blatt, M., Kohler, L., Padilla, E., & Bruckschen,
   sudo apt-get install lsof genisoimage
   ```
 
-- Make sure the Python requirements are installed
+- Make sure the Python requirements are installed, by running this from the cloned repository folder.
   ```bash
-  cd <gemu-repo-dir>/gemu
+  cd gemu
   pip install -r requirements.txt
   ```
   
@@ -31,7 +31,6 @@ Citation: Jenke, T., Ufer, M., Blatt, M., Kohler, L., Padilla, E., & Bruckschen,
 Similar to regular QEMU build, but with some extra configure arguments.
 
 ```bash
-cd <gemu-repo-dir>
 mkdir build
 cd build
 ../configure --target-list=x86_64-softmmu --disable-werror
@@ -41,7 +40,6 @@ make -j`nproc`
 Note, that the the NFS support is broken on ArchLinux, thus this needs to be disabled for the build to succeed.
 
 ```bash
-cd <gemu-repo-dir>
 mkdir build
 cd build
 ../configure --target-list=x86_64-softmmu --disable-werror --disable-libnfs
@@ -64,6 +62,7 @@ GeMU requires a symbol mapping that has to be created for the exact VM image use
 - This has to be repeated for each Windows version before starting the sandboxing.
 
 ```bash
+cd gemu
 mkdir /path/to/a/mountpoint
 sudo guestmount -o allow_other -a /path/to/VM_Image.qcow -m /dev/sda2 --ro /path/to/a/mountpoint
 python3 generate_symbol_mapping.py --path /path/to/a/mountpoint --outfile ~/.gemu/symbol_mapping.txt
@@ -75,7 +74,7 @@ rmdir /path/to/a/mountpoint
 You need to enter the VM details in a config file:
 
 ```bash
-cd <gemu-repo-dir>/gemu/gemuinteractor
+cd gemu/gemuinteractor
 cp config.py.template config.py
 # Edit as required
 $EDITOR config.py
@@ -92,7 +91,7 @@ To learn more about all available options and parameters, try the `--help` flag.
 
 Make sure you are in the right directory:
 ```bash
-cd <gemu-repo-dir>/gemu
+cd gemu
 ```
 
 ### Single File
