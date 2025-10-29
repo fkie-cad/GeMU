@@ -36,9 +36,9 @@ class Recipe:
 
     def _get_recipe_dict(self, sample: Path|str, export: str|None) -> dict:
         filetype = subprocess.check_output(["file", "-b", sample]).decode("utf-8")
-        if filetype.startswith("PE32"):
+        if "PE32" in filetype:
             if export:
-                if filetype.startswith("PE32+"): # 64bit Library
+                if "PE32+" in filetype: # 64bit Library
                     return self.parse_yaml(RECIPE_FOLDER / "single_library_with_export_64bit.yml")
                 else:  # 32bit Library
                     return self.parse_yaml(RECIPE_FOLDER / "single_library_with_export_32bit.yml")
