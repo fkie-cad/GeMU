@@ -41,7 +41,10 @@ class GemuRunnerMultipleFiles:
     def _samples_as_list(self):
         with open(self._samples, "r") as f:
             for line in f:
-                path_line = Path(line.strip())
+                path_str = line.strip()
+                if not path_str:
+                    continue
+                path_line = Path(path_str)
                 print(f"running {path_line}")
                 if path_line.is_file():
                     if not self._already_ran(path_line):
