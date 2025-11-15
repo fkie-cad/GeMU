@@ -12,7 +12,7 @@ FORBIDDEN = [".log", ".txt", "dump", "pandalog", "dmp7", "dumps", "elf", "pandal
 
 class GemuRunnerMultipleFiles:
     def __init__(self, samples: Path|str, time: int, runname: str, yararules: Path|str|None, trackingmode: str, dotnet: str|None,
-                 allowmultipleruns: bool, configs: str, malpedia_mode: bool):
+                 allowmultipleruns: bool, configs: str, malpedia_mode: bool, tracing: bool):
         self._samples = Path(samples)
         self._malpedia_mode = malpedia_mode
         self._configs = configs
@@ -22,6 +22,7 @@ class GemuRunnerMultipleFiles:
         self._runname = runname
         self._trackingmode = trackingmode
         self._allowmultipleruns = allowmultipleruns
+        self._tracing = tracing
 
     def run(self):
         scheduler = Scheduler(self._executeAnalysisLive, get_vm_pool(self._configs))
@@ -91,6 +92,8 @@ class GemuRunnerMultipleFiles:
                 "--config", vm,
                 "--trackingmode", self._trackingmode,
                 ]
+            if self._tracing:
+                call += ["--tracing"]
             if self._dotnet is not None:
                 call += ["--dotnet", self._dotnet]
             if self._yararules is not None:
