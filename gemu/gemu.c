@@ -702,8 +702,9 @@ void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
     } else {
         output = read_parameters64(gemu_instance, cpu, func_name, dll_name, out_parameter_list, process);
     }
-    if (cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint ==
-        0) {
+    int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
+    // This is hacky, but in most cases, handle 7 is the current process
+    if ((handle == 0) || (handle == 7)) { 
         printf("Removing PID %lli\n", process->ID);
         //dump_all_binaries(cpu, process);
         g_hash_table_remove(gemu_instance->pids_to_lookout_for,
