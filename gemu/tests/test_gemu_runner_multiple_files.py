@@ -73,3 +73,28 @@ def test_folder(tmpdir):
         num_folders += 1
 
     assert num_folders == 2
+
+
+def test_empty_line(tmpdir):
+    tmpdir = Path(tmpdir).absolute()
+    inner_dir = tmpdir / "inner_dir"
+    inner_dir.mkdir()
+    file1 = shutil.copy(SMALL_BITNESS_PE, inner_dir/"file1.exe")
+    file2 = shutil.copy(SMALL_BITNESS_PE, inner_dir/"file2.exe")
+
+    sample_list = tmpdir/"list.txt"
+    sample_list.write_text(f"\n{file1}\n\n{file2}\n\n\n")
+
+    runname = "gemu_list_test"
+    runner = GemuRunnerMultipleFiles(
+        samples=sample_list,
+        time=2,
+        configs="win10_pool",
+        runname=runname,
+        yararules=None,
+        trackingmode="syscall",
+        dotnet=None,
+        allowmultipleruns=False,
+        malpedia_mode=False
+    )
+    assert len([*runner._samples_as_list()]) == 2
