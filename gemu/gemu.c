@@ -499,7 +499,11 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     }
-    printf("%llu:%llu:$-%s -> %li\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
+
+    QWORD pid;                                                                                                                                                                     
+    QWORD tid;
+    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    printf("%llu:%llu:$-%s -> %li\n", pid, tid, cJSON_PrintUnformatted(output), ret);
 
     switch (hook->syscall_enum)
     {
@@ -539,7 +543,11 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     }
-    printf("%llu:%llu:$-%s -> %li\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
+
+    QWORD pid;                                                                                                                                                                     
+    QWORD tid;
+    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    printf("%llu:%llu:$-%s -> %li\n", pid, tid, cJSON_PrintUnformatted(output), ret);
 
     //load library is always interesting, for DOTNET and WINAPI case
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
@@ -850,7 +858,7 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &hook_ptr->out_parameter_list, process);
     }
 
-    printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
+    printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
     cJSON_Delete(output);
 }
 
@@ -901,7 +909,10 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook.out_parameter_list, process);
     }
 
-    printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
+    QWORD pid;                                                                                                                                                                     
+    QWORD tid;
+    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);
