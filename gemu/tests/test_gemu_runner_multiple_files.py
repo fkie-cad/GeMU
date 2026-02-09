@@ -27,7 +27,8 @@ def test_list(tmpdir):
         trackingmode="syscall",
         dotnet=None,
         allowmultipleruns=False,
-        malpedia_mode=False
+        malpedia_mode=False,
+        tracing=False
     )
 
     runner.run()
@@ -59,7 +60,8 @@ def test_folder(tmpdir):
         trackingmode="syscall",
         dotnet=None,
         allowmultipleruns=False,
-        malpedia_mode=False
+        malpedia_mode=False,
+        tracing=False
     )
 
     runner.run()

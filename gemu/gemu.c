@@ -5,6 +5,7 @@
 #include "gemu/memorymapper.h"
 #include "gemu/mappedwaitinglist.h"
 #include "glib.h"
+#include "gemu/apidoc.h"
 #include "gemu/hooks.h"
 #include "gemu/win_spector.h"
 #include "gemu/dotnet_spector.h"
@@ -43,66 +44,6 @@ char tracking_mode_str[256];
 char dotnet_mode_str[256];
 char syscalltable[256];
 // struct timespec* start_time = NULL;
-
-char *read_file(const char *filename) {
-    FILE *file = NULL;
-    long length = 0;
-    char *content = NULL;
-    size_t read_chars = 0;
-
-    /* open in read binary mode */
-    file = fopen(filename, "rb");
-    if (file == NULL) {
-        goto cleanup;
-    }
-
-    /* get the length */
-    if (fseek(file, 0, SEEK_END) != 0) {
-        goto cleanup;
-    }
-    length = ftell(file);
-    if (length < 0) {
-        goto cleanup;
-    }
-    if (fseek(file, 0, SEEK_SET) != 0) {
-        goto cleanup;
-    }
-
-    /* allocate content buffer */
-    content = (char *) malloc((size_t) length + sizeof(""));
-    if (content == NULL) {
-        goto cleanup;
-    }
-
-    /* read the file into memory */
-    read_chars = fread(content, sizeof(char), (size_t) length, file);
-    if ((long) read_chars != length) {
-        free(content);
-        content = NULL;
-        goto cleanup;
-    }
-    content[read_chars] = '\0';
-
-    cleanup:
-    if (file != NULL) {
-        fclose(file);
-    }
-
-    return content;
-}
-
-static cJSON *parse_file(const char *filename) {
-    cJSON *parsed = NULL;
-    char *content = read_file(filename);
-
-    parsed = cJSON_Parse(content);
-
-    if (content != NULL) {
-        free(content);
-    }
-
-    return parsed;
-}
 
 const char *PSTR[] = {"Windows.Win32.Foundation.PSTR", "LPCWSTR", NULL};
 const char *PWSTR[] = {"Windows.Win32.Foundation.PWSTR", "LPCSTR", NULL};
@@ -231,64 +172,51 @@ cJSON *read_parameters64(Gemu *gemu_instance, CPUState *cpu, const char *func_na
     cJSON *output = cJSON_CreateObject();
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
-    const cJSON *function_entry = NULL;
-    function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
-    cJSON *parameter;
+    FunctionParameter *parameter;
     int outparameter = 0;
-    for (int i = 0; i < cJSON_GetArraySize(parameters_array); i++) {
-        parameter = cJSON_GetArrayItem(parameters_array, i);
+    for (int i = 0; i < function_entry->num_parameters; i++) {
+        parameter = &function_entry->parameters[i];
         QWORD value = get_parameter64(cpu, i);
-        while (strstr(cJSON_GetArrayItem(parameter, 0)->valuestring, "in")) {
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                     PSTR)) {
+        while (is_in_parameter(parameter)) {
+            if (is_parameter_type_in(parameter->type, PSTR)) {
                 char *s = malloc(256);
                 guest_astrncpy(cpu, s, 256, value);
-                cJSON_AddStringToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+                cJSON_AddStringToObject(output, parameter->name, s);
                 free(s);
                 break;
             }
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                     PWSTR)) {
+            if (is_parameter_type_in(parameter->type, PWSTR)) {
                 char *s = malloc(512);
                 guest_wstrncpy(cpu, s, 512, value);
-                cJSON_AddStringToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+                cJSON_AddStringToObject(output, parameter->name, s);
                 free(s);
                 break;
             }
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                     PROCESS_INFORMATION_PARAS)) {
-                cJSON *process_information = cJSON_AddObjectToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring);
+            if (is_parameter_type_in(parameter->type, PROCESS_INFORMATION_PARAS)) {
+                cJSON *process_information = cJSON_AddObjectToObject(output, parameter->name);
                 fill_processinformation64(cpu, value, process_information, process);
                 break;
             }
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                     DO_NOT_DEREFRENCE)) {
-                cJSON_AddNumberToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, value);
+            if (is_parameter_type_in(parameter->name, DO_NOT_DEREFRENCE)) {
+                cJSON_AddNumberToObject(output, parameter->name, value);
                 break;
             }
-            if (strstr(cJSON_GetArrayItem(parameter, 1)->valuestring, "*")) {
-                int dereferences = count_dereferences(cJSON_GetArrayItem(parameter, 1)->valuestring);
+            if (strstr(parameter->type, "*")) {
+                int dereferences = count_dereferences(parameter->type);
                 QWORD deref_value = dereference_pointer64(cpu, value, dereferences);
                 //value = dereference_pointer64(cpu, value, derefenceres);
-                cJSON_AddNumberToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, deref_value);
+                cJSON_AddNumberToObject(output, parameter->name, deref_value);
                 break;
             }
-            cJSON_AddNumberToObject(
-                    output, cJSON_GetArrayItem(parameter, 2)->valuestring, value);
+            cJSON_AddNumberToObject(output, parameter->name, value);
             break;
         }
-        if (strstr(cJSON_GetArrayItem(parameter, 0)->valuestring, "out")) {
+        if (is_out_parameter(parameter)) {
             out_parameter_list->out_parameters[outparameter].address = value;
             out_parameter_list->out_parameters[outparameter].parameter_number = i;
             outparameter += 1;
@@ -304,63 +232,50 @@ cJSON *read_parameters32(Gemu *gemu_instance, CPUState *cpu, const char *func_na
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
     out_parameter_list->number_of_outparameters = 0;
-    const cJSON *function_entry = NULL;
-    function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
-    cJSON *parameter;
+    FunctionParameter *parameter;
     int outparameter = 0;
-    for (int i = 0; i < cJSON_GetArraySize(parameters_array); i++) {
-        parameter = cJSON_GetArrayItem(parameters_array, i);
+    for (int i = 0; i < function_entry->num_parameters; i++) {
+        parameter = &function_entry->parameters[i];
         DWORD value = get_parameter32(cpu, i);
-        while (strstr(cJSON_GetArrayItem(parameter, 0)->valuestring, "in")) {
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                     PSTR)) {
+        while (is_in_parameter(parameter)) {
+            if (is_parameter_type_in(parameter->type, PSTR)) {
                 char *s = malloc(256);
                 guest_astrncpy(cpu, s, 256, value);
-                cJSON_AddStringToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+                cJSON_AddStringToObject(output, parameter->name, s);
                 free(s);
                 break;
             }
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                     PWSTR)) {
+            if (is_parameter_type_in(parameter->type, PWSTR)) {
                 char *s = malloc(512);
                 guest_wstrncpy(cpu, s, 512, value);
-                cJSON_AddStringToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+                cJSON_AddStringToObject(output, parameter->name, s);
                 free(s);
                 break;
             }
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                     PROCESS_INFORMATION_PARAS)) {
-                cJSON *process_information = cJSON_AddObjectToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring);
+            if (is_parameter_type_in(parameter->type, PROCESS_INFORMATION_PARAS)) {
+                cJSON *process_information = cJSON_AddObjectToObject(output, parameter->name);
                 fill_processinformation32(cpu, value, process_information, process);
                 break;
             }
-            if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                     DO_NOT_DEREFRENCE)) {
-                cJSON_AddNumberToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, value);
+            if (is_parameter_type_in(parameter->name, DO_NOT_DEREFRENCE)) {
+                cJSON_AddNumberToObject(output, parameter->name, value);
                 break;
             }
-            if (strstr(cJSON_GetArrayItem(parameter, 1)->valuestring, "*")) {
-                int dereferences = count_dereferences(cJSON_GetArrayItem(parameter, 1)->valuestring);
+            if (strstr(parameter->type, "*")) {
+                int dereferences = count_dereferences(parameter->type);
                 DWORD deref_value = dereference_pointer32(cpu, value, dereferences);
-                cJSON_AddNumberToObject(
-                        output, cJSON_GetArrayItem(parameter, 2)->valuestring, deref_value);
+                cJSON_AddNumberToObject(output, parameter->name, deref_value);
                 break;
             }
-            cJSON_AddNumberToObject(
-                    output, cJSON_GetArrayItem(parameter, 2)->valuestring, value);
+            cJSON_AddNumberToObject(output, parameter->name, value);
             break;
         }
-        if (strstr(cJSON_GetArrayItem(parameter, 0)->valuestring, "out")) {
+        if (is_out_parameter(parameter)) {
             out_parameter_list->out_parameters[outparameter].address = value;
             out_parameter_list->out_parameters[outparameter].parameter_number = i;
             outparameter += 1;
@@ -380,61 +295,44 @@ cJSON *read_out_parameters32(Gemu *gemu, CPUState *cpu, const char *func_name,
         return output;
     }
 
-    cJSON *function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
-    cJSON *parameter;
+    FunctionParameter *parameter;
     for (int i = 0; i < number_of_outparameters; i++) {
-        parameter = cJSON_GetArrayItem(parameters_array,
-                                       out_parameters[i].parameter_number);
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                 PSTR)) {
+        parameter = &function_entry->parameters[out_parameters[i].parameter_number];
+        if (is_parameter_type_in(parameter->type, PSTR)) {
             char *s = malloc(256);
             guest_astrncpy(cpu, s, 256, out_parameters[i].address);
-            cJSON_AddStringToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+            cJSON_AddStringToObject(output, parameter->name, s);
             free(s);
             continue;
         }
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                 PWSTR)) {
+        if (is_parameter_type_in(parameter->type, PWSTR)) {
             char *s = malloc(512);
             guest_wstrncpy(cpu, s, 512, out_parameters[i].address);
-            cJSON_AddStringToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+            cJSON_AddStringToObject(output, parameter->name, s);
             free(s);
             continue;
         }
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                 PROCESS_INFORMATION_PARAS)) {
-            cJSON *process_information = cJSON_AddObjectToObject(
-                    output, cJSON_GetArrayItem(parameter, 2)->valuestring);
+        if (is_parameter_type_in(parameter->type, PROCESS_INFORMATION_PARAS)) {
+            cJSON *process_information = cJSON_AddObjectToObject(output, parameter->name);
             fill_processinformation32(cpu, out_parameters[i].address,
                                       process_information, process);
             continue;
         }
-        if (strcmp(cJSON_GetArrayItem(parameter, 1)->valuestring, "*CLIENT_ID") ==
-            0) {
-            cJSON_AddNumberToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                    out_parameters[i].address);
+        if (strcmp(parameter->type, "*CLIENT_ID") == 0) {
+            cJSON_AddNumberToObject(output, parameter->name,  out_parameters[i].address);
             continue;
         }
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                 DO_NOT_DEREFRENCE)) {
-            cJSON_AddNumberToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                    out_parameters[i].address);
+        if (is_parameter_type_in(parameter->name, DO_NOT_DEREFRENCE)) {
+            cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
             continue;
         }
-        int derefenceres = count_dereferences(cJSON_GetArrayItem(parameter, 1)->valuestring);
-        DWORD value = dereference_pointer32(cpu, out_parameters[i].address, derefenceres);
-        cJSON_AddNumberToObject(output, cJSON_GetArrayItem(parameter, 2)->valuestring, value);
+        int dereferences = count_dereferences(parameter->type);
+        DWORD value = dereference_pointer32(cpu, out_parameters[i].address, dereferences);
+        cJSON_AddNumberToObject(output, parameter->name, value);
         continue;
     }
     return output;
@@ -451,64 +349,44 @@ cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
         return output;
     }
 
-    cJSON *function_entry = cJSON_GetObjectItemCaseSensitive(
-            gemu_instance->parameter_lookup, func_name);
-    if (!cJSON_IsObject(function_entry)) {
+    FunctionApi* function_entry = get_function_api(gemu_instance->parameter_lookup, func_name);
+    if (function_entry == NULL) {
         return output;
     }
-
-    cJSON *parameters_array =
-            cJSON_GetObjectItemCaseSensitive(function_entry, "parameters");
-    cJSON *parameter;
+    FunctionParameter *parameter;
     for (int i = 0; i < number_of_outparameters; i++) {
-        parameter = cJSON_GetArrayItem(parameters_array,
-                                       out_parameters[i].parameter_number);
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                 PSTR)) {
+        parameter = &function_entry->parameters[out_parameters[i].parameter_number];
+        if (is_parameter_type_in(parameter->type, PSTR)) {
             char *s = malloc(256);
             guest_astrncpy(cpu, s, 256, out_parameters[i].address);
-            cJSON_AddStringToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+            cJSON_AddStringToObject(output, parameter->name, s);
             free(s);
             continue;
         }
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                 PWSTR)) {
+        if (is_parameter_type_in(parameter->type, PWSTR)) {
             char *s = malloc(512);
             guest_wstrncpy(cpu, s, 512, out_parameters[i].address);
-            cJSON_AddStringToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring, s);
+            cJSON_AddStringToObject(output, parameter->name, s);
             free(s);
             continue;
         }
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 1)->valuestring,
-                                 PROCESS_INFORMATION_PARAS)) {
-            cJSON *process_information = cJSON_AddObjectToObject(
-                    output, cJSON_GetArrayItem(parameter, 2)->valuestring);
-            fill_processinformation64(cpu, out_parameters[i].address,
-                                      process_information, process);
+        if (is_parameter_type_in(parameter->type, PROCESS_INFORMATION_PARAS)) {
+            cJSON *process_information = cJSON_AddObjectToObject(output, parameter->name);
+            fill_processinformation64(cpu, out_parameters[i].address, process_information, process);
             continue;
         }
-        if (strcmp(cJSON_GetArrayItem(parameter, 1)->valuestring, "*CLIENT_ID") ==
+        if (strcmp(parameter->type, "*CLIENT_ID") ==
             0) {
-            cJSON_AddNumberToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                    out_parameters[i].address);
+            cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
             continue;
         }
-        if (is_parameter_type_in(cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                 DO_NOT_DEREFRENCE)) {
-            cJSON_AddNumberToObject(output,
-                                    cJSON_GetArrayItem(parameter, 2)->valuestring,
-                                    out_parameters[i].address);
+        if (is_parameter_type_in(parameter->name, DO_NOT_DEREFRENCE)) {
+            cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
             continue;
         }
-        int derefenceres =
-                count_dereferences(cJSON_GetArrayItem(parameter, 1)->valuestring);
-        DWORD value =
-                dereference_pointer64(cpu, out_parameters[i].address, derefenceres);
-        cJSON_AddNumberToObject(
-                output, cJSON_GetArrayItem(parameter, 2)->valuestring, value);
+        int dereferences = count_dereferences(parameter->type);
+        DWORD value = dereference_pointer64(cpu, out_parameters[i].address, derefenceres);
+        cJSON_AddNumberToObject(output, parameter->name, value);
         continue;
     }
     return output;
@@ -621,7 +499,11 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     }
-    printf("%llu:%llu:$-%s -> %li\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
+
+    QWORD pid;                                                                                                                                                                     
+    QWORD tid;
+    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    printf("%llu:%llu:$-%s -> %li\n", pid, tid, cJSON_PrintUnformatted(output), ret);
 
     switch (hook->syscall_enum)
     {
@@ -661,7 +543,11 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     }
-    printf("%llu:%llu:$-%s -> %li\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output), ret);
+
+    QWORD pid;                                                                                                                                                                     
+    QWORD tid;
+    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    printf("%llu:%llu:$-%s -> %li\n", pid, tid, cJSON_PrintUnformatted(output), ret);
 
     //load library is always interesting, for DOTNET and WINAPI case
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
@@ -973,7 +859,7 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &hook_ptr->out_parameter_list, process);
     }
 
-    printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
+    printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
     cJSON_Delete(output);
 }
 
@@ -1024,7 +910,10 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook.out_parameter_list, process);
     }
 
-    printf("%llu:%llu:$+%s\n", process->ID, (unsigned long long)0, cJSON_PrintUnformatted(output));
+    QWORD pid;                                                                                                                                                                     
+    QWORD tid;
+    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);
@@ -1489,7 +1378,7 @@ void gemu_init(void) {
     Gemu instance = {
             .hooker = init_hooker(100000),
             .win_spec = init_windows_introspecter(200, WATCHED_PROGRAMS),
-            .parameter_lookup = parse_file(apidoc),
+            .parameter_lookup = init_apidoc(apidoc),
             .syscall_lookup = parse_file(syscalltable),
             .syscall_lookup_for_build = NULL,
             .syscall_lookup_for_build_enum = NULL,

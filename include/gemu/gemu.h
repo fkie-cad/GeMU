@@ -107,8 +107,6 @@ DWORD dereference_pointer32(CPUState *cpu, DWORD value, int times);
 
 int count_dereferences(char *s);
 
-char *read_file(const char *filename);
-
 void wi_extract_module_list(CPUState *cpu, WinProcess *process);
 
 void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process,
