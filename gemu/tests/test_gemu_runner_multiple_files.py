@@ -20,7 +20,7 @@ def test_list(tmpdir):
     runname = "gemu_list_test"
     runner = GemuRunnerMultipleFiles(
         samples=sample_list,
-        time=2,
+        time=3,
         configs="win10_pool",
         runname=runname,
         yararules=None,
@@ -28,7 +28,7 @@ def test_list(tmpdir):
         dotnet=None,
         allowmultipleruns=False,
         malpedia_mode=False,
-        tracing=False
+        tracing=False,
     )
 
     runner.run()
@@ -61,7 +61,7 @@ def test_folder(tmpdir):
         dotnet=None,
         allowmultipleruns=False,
         malpedia_mode=False,
-        tracing=False
+        tracing=False,
     )
 
     runner.run()
@@ -97,6 +97,7 @@ def test_empty_line(tmpdir):
         trackingmode="syscall",
         dotnet=None,
         allowmultipleruns=False,
-        malpedia_mode=False
+        malpedia_mode=False,
+        tracing=False,
     )
     assert len([*runner._samples_as_list()]) == 2
