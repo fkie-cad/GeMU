@@ -330,8 +330,8 @@ cJSON *read_out_parameters32(Gemu *gemu, CPUState *cpu, const char *func_name,
             cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
             continue;
         }
-        int derefenceres = count_dereferences(parameter->type);
-        DWORD value = dereference_pointer32(cpu, out_parameters[i].address, derefenceres);
+        int dereferences = count_dereferences(parameter->type);
+        DWORD value = dereference_pointer32(cpu, out_parameters[i].address, dereferences);
         cJSON_AddNumberToObject(output, parameter->name, value);
         continue;
     }
@@ -384,7 +384,7 @@ cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
             cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
             continue;
         }
-        int derefenceres = count_dereferences(parameter->type);
+        int dereferences = count_dereferences(parameter->type);
         DWORD value = dereference_pointer64(cpu, out_parameters[i].address, derefenceres);
         cJSON_AddNumberToObject(output, parameter->name, value);
         continue;

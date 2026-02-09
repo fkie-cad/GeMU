@@ -25,7 +25,7 @@ typedef struct {
 } FunctionApi;
 
 
-Apidoc* init_apidoc(char* apidoc_path);
+Apidoc* init_apidoc(const char* apidoc_path);
 
 FunctionApi* get_function_api(Apidoc* apidoc, const char* function_name);
 

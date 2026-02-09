@@ -61,11 +61,7 @@ static Apidoc* apidoc_to_hashtable(cJSON* json_apidoc){
     while ((json_apidoc_entry =  cJSON_GetArrayItem(json_apidoc, 0)) != NULL){
         current_key = (gpointer)g_strdup(json_apidoc_entry->string);
         cJSON_DetachItemViaPointer(json_apidoc, json_apidoc_entry);
-        g_hash_table_insert(
-            hash_table,
-            current_key,
-            convert_function_entry(json_apidoc_entry)
-        );
+        g_hash_table_insert(hash_table, current_key, convert_function_entry(json_apidoc_entry));
     }
 
     cJSON_Delete(json_apidoc);
@@ -73,7 +69,7 @@ static Apidoc* apidoc_to_hashtable(cJSON* json_apidoc){
 }
 
 
-Apidoc* init_apidoc(char* apidoc_path){
+Apidoc* init_apidoc(const char* apidoc_path){
     printf("initialize apidoc\n");
     cJSON* json_apidoc = parse_file(apidoc_path);
     return apidoc_to_hashtable(json_apidoc);
