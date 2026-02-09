@@ -12,7 +12,7 @@ FORBIDDEN = [".log", ".txt", "dump", "pandalog", "dmp7", "dumps", "elf", "pandal
 
 class GemuRunnerMultipleFiles:
     def __init__(self, samples: Path|str, time: int, runname: str, yararules: Path|str|None, trackingmode: str, dotnet: str|None,
-                 allowmultipleruns: bool, configs: str, malpedia_mode: bool, tracing: bool):
+                 allowmultipleruns: bool, configs: str, malpedia_mode: bool, codecarver: bool, tracing: bool):
         self._samples = Path(samples)
         self._malpedia_mode = malpedia_mode
         self._configs = configs
@@ -22,6 +22,7 @@ class GemuRunnerMultipleFiles:
         self._runname = runname
         self._trackingmode = trackingmode
         self._allowmultipleruns = allowmultipleruns
+        self._codecarver = codecarver
         self._tracing = tracing
 
     def run(self):
@@ -101,6 +102,8 @@ class GemuRunnerMultipleFiles:
                 call += ["--dotnet", self._dotnet]
             if self._yararules is not None:
                 call.extend(["--yararules", self._yararules])
+            if self._codecarver:
+                call.append("--codecarver")
 
             print(" ".join(call))
             subprocess.check_call(call)

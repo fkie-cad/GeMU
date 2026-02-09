@@ -198,6 +198,7 @@ extern char WATCHED_PROGRAMS[256];
 extern char tracking_mode_str[256];
 extern char dotnet_mode_str[256];
 extern char syscalltable[256];
+extern bool gemu_use_codecarver;
 extern bool gemu_use_tracing;
 
 static struct {
@@ -3255,6 +3256,9 @@ void qemu_init(int argc, char **argv)
                 break;
             case QEMU_OPTION_dotnet:
                 snprintf(dotnet_mode_str, sizeof(dotnet_mode_str), "%s", optarg);
+                break;
+            case QEMU_OPTION_codecarving:
+                gemu_use_codecarver = true;
                 break;
             case QEMU_OPTION_gemutracing:
                 gemu_use_tracing = true;

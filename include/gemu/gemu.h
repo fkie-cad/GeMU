@@ -32,6 +32,7 @@ typedef struct {
   void *modules_to_hook;
   bool recording;
   TrackingMode tracking_mode;
+  GHashTable *dumped_hashes;
 } Gemu;
 
 typedef struct Module {

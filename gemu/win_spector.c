@@ -184,6 +184,8 @@ void print_memory_map(CPUState *cpu, WinProcess *process) {
   process->cache_section_written = NULL;
   freeList(process->new_sections);
   process->new_sections = latest_sections;
+  // Mark sections as dirty so reduced_sections cache is rebuilt
+  process->sections_dirty = true;
 }
 
 void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid, WinProcess *process) {
@@ -258,7 +260,10 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
       .current_modules = NULL,
       .bitness = BITNESS_UNKNOWN,
       .threads_by_tid = g_hash_table_new(NULL, NULL),
-      .gsbase = 0
+      .gsbase = 0,
+      .reduced_sections = { .head = NULL },
+      .sections_dirty = true,
+      .has_pending_writes = false
   };
   newThread.is_excluded = is_process_excluded(w, &newThread);
   *newThreadPtr = newThread;

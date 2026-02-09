@@ -1,7 +1,7 @@
 from itertools import chain
 from pathlib import Path
 import shutil
-
+from unittest.mock import patch
 import pytest
 from tests.test_gemu_runner_single_file import SMALL_BITNESS_PE
 from gemuinteractor.gemu_runner_multiple_files import GemuRunnerMultipleFiles
@@ -28,6 +28,7 @@ def test_list(tmpdir):
         dotnet=None,
         allowmultipleruns=False,
         malpedia_mode=False,
+        codecarver=False,
         tracing=False,
     )
 
@@ -61,6 +62,7 @@ def test_folder(tmpdir):
         dotnet=None,
         allowmultipleruns=False,
         malpedia_mode=False,
+        codecarver=False,
         tracing=False,
     )
 
@@ -75,6 +77,58 @@ def test_folder(tmpdir):
         num_folders += 1
 
     assert num_folders == 2
+
+
+def test_codecarver_flag_included_when_enabled(tmpdir):
+    tmpdir = Path(tmpdir).absolute()
+    sample_file = shutil.copy(SMALL_BITNESS_PE, tmpdir / "sample.exe")
+
+    runner = GemuRunnerMultipleFiles(
+        samples=tmpdir,
+        time=2,
+        configs="win10_pool",
+        runname="test_codecarver",
+        yararules=None,
+        trackingmode="syscall",
+        dotnet=None,
+        allowmultipleruns=False,
+        malpedia_mode=False,
+        codecarver=True,
+        tracing=False,
+    )
+
+    with patch('subprocess.check_call') as mock_check_call:
+        runner._executeAnalysisLive(sample_file, "test_vm")
+
+        mock_check_call.assert_called_once()
+        call_args = mock_check_call.call_args[0][0]
+        assert "--codecarver" in call_args
+
+
+def test_codecarver_flag_excluded_when_disabled(tmpdir):
+    tmpdir = Path(tmpdir).absolute()
+    sample_file = shutil.copy(SMALL_BITNESS_PE, tmpdir / "sample.exe")
+
+    runner = GemuRunnerMultipleFiles(
+        samples=tmpdir,
+        time=2,
+        configs="win10_pool",
+        runname="test_codecarver",
+        yararules=None,
+        trackingmode="syscall",
+        dotnet=None,
+        allowmultipleruns=False,
+        malpedia_mode=False,
+        codecarver=False,
+        tracing=False,
+    )
+
+    with patch('subprocess.check_call') as mock_check_call:
+        runner._executeAnalysisLive(sample_file, "test_vm")
+
+        mock_check_call.assert_called_once()
+        call_args = mock_check_call.call_args[0][0]
+        assert "--codecarver" not in call_args
 
 
 def test_empty_line(tmpdir):
@@ -98,6 +152,7 @@ def test_empty_line(tmpdir):
         dotnet=None,
         allowmultipleruns=False,
         malpedia_mode=False,
+        codecarver=False,
         tracing=False,
     )
     assert len([*runner._samples_as_list()]) == 2

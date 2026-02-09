@@ -113,5 +113,5 @@ python3 unpack_multiple_file.py --samples sample_folders_list.txt --allowduplica
 ## Roadmap
 - [x] per-thread matching of syscall/sysret pairs
 - [x] prevent unpacking from failing when mounting takes longer than expected
-- [ ] PE-carving
+- [x] PE-carving
 - [ ] improve .NET unpacking capabilities

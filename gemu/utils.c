@@ -1,4 +1,40 @@
 #include "gemu/utils.h"
+#include <sys/stat.h>
+
+static bool dumps_dir_initialized = false;
+
+// Ensures the dumps directory exists (called once)
+static void ensure_dumps_dir(void) {
+    if (!dumps_dir_initialized) {
+        mkdir("dumps", 0777);
+        dumps_dir_initialized = true;
+    }
+}
+
+bool gemu_dump_buffer_to_file(const uint8_t *buf, size_t length, const char *filename) {
+    if (buf == NULL || length == 0 || filename == NULL) {
+        return false;
+    }
+
+    ensure_dumps_dir();
+
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("Error opening dump file");
+        return false;
+    }
+
+    size_t written = fwrite(buf, 1, length, file);
+    fclose(file);
+
+    if (written != length) {
+        perror("Error writing dump file");
+        return false;
+    }
+
+    printf("Data successfully written to %s\n", filename);
+    return true;
+}
 
 /*
   returns current asid or address-space id.

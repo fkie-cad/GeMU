@@ -9,17 +9,23 @@
 #include "gemu/syscalltable.h"
 #include <time.h>
 #include "monitor/monitor.h"
+#include "gemu/xxhash64.h"
+#include "qemu/xxhash.h"
 
 bool gemu_use_memcb = false;
 bool gemu_use_exec = false;
 bool gemu_use_translation = false;
 bool gemu_use_syscall = true;
+bool gemu_use_codecarver = false;
+
 bool gemu_use_tracing = false;
  // This should be set to true by default. This will make it impossible to miss compilation in case setup is delayed.
 bool gemu_compile_syscall_helper = true;
 int counter = 0;
 long long extracted_data_size = 0;
 
+#define MAX_DUMP_COUNT 100000
+#define MAX_EXTRACTED_SIZE 10000000000LL  // 10GB
 
 bool* getWrittenFlagForNode(struct MappedMemoryNode* mmapNode) {
     Gemu *gemu_instance = gemu_get_instance();
@@ -82,12 +88,9 @@ bool iterateAndUpdateList(struct SingleLinkedList* singleList, struct DoubleLink
         bool shouldRemove = convertToSharedWrittenBit(current, doubleList);
 
         if (shouldRemove) {
-            // Remove the current node from the list
             if (prev == NULL) {
-                // Removing the head node
                 singleList->head = current->next;
             } else {
-                // Removing a node that is not the head
                 prev->next = current->next;
             }
 
@@ -115,8 +118,21 @@ ModuleNode* is_within_range(ModuleNode* head, hwaddr start, hwaddr end) {
 }
 
 
+static void process_mapped_sections_waitinglist(Gemu *gemu_instance, WinProcess *process) {
+    struct SingleLinkedList *list = getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, process->ID);
+    if (list == NULL) {
+        return;
+    }
+
+    bool list_is_empty = iterateAndUpdateList(list, process->new_sections);
+    if (list_is_empty) {
+        removeList(gemu_instance->mapped_sections_waitinglist, process->ID);
+    }
+}
+
+
 void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *process, Gemu *gemu_instance){
-    if (counter > 100000 || extracted_data_size > 10e+9) {
+    if (counter > MAX_DUMP_COUNT || extracted_data_size > MAX_EXTRACTED_SIZE) {
         return;
     }
     // checking for unpacking
@@ -156,7 +172,7 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
         struct Node* section = getNodeForAddress(cpu->env_ptr->eip, &new_list);
         if(process->cache_section_written != NULL && (
             (process->cache_section_written->start >= section->start && process->cache_section_written->start <= section->end) ||
-            (process->cache_section_written->end >= section->start && process->cache_section_written->end <= section->end) 
+            (process->cache_section_written->end >= section->start && process->cache_section_written->end <= section->end)
         ))
             process->cache_section_written = NULL;
 
@@ -178,15 +194,7 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
         }
         unsetWrittenFlagForRange(section->start, section->end, process->new_sections);
         counter += 1;
-        mkdir("dumps", 0777);
-        FILE* file = fopen(filename, "wb");
-        if (file != NULL && length != 0) {
-            fwrite(buf, 1, length, file);
-            fclose(file);
-            printf("Data successfully written to %s\n", filename);
-        } else {
-            perror("Error opening file");
-        }
+        gemu_dump_buffer_to_file(buf, length, filename);
         free(buf);
         freeList(&new_list);
     }
@@ -277,7 +285,7 @@ void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend)
         return;
     }
     Gemu *gemu_instance = gemu_get_instance();
-   
+
     syscall_t syscall_enum = lookup_syscall_enum(gemu_instance, cpu->regs[R_EAX] & 0xfff, &gemu_helper_get_current_process);
     if (syscall_enum == 0){
         return;
@@ -292,7 +300,7 @@ void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend)
     }
 
     // char* funcname = lookup_syscall(gemu_instance, &process->Process, cpu->regs[R_EAX]);
-    const char* funcname2 = SYSCALL_NAMES[syscall_enum];
+    // const char* funcname2 = SYSCALL_NAMES[syscall_enum];
     
     // printf("SYSCALL: %lx %s\n", cpu->regs[R_EAX], funcname2);
     //print_module_nodes(process->current_modules);
@@ -307,25 +315,30 @@ void gemu_cb_sysret(CPUX86State *cpu)
     if (cpu == NULL) {
         return;
     }
+
     Gemu *gemu_instance = gemu_get_instance();
+    CPUState *cpu_state = current_cpu;
 
-    CPUState *cpu_new = current_cpu;
+    WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu_state, true);
+    if (process == NULL) {
+        return;
+    }
 
-    WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu_new, true);
-    if (process == NULL || !g_hash_table_contains(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(process->ID))) {
-        // Exit early if the current program is not the one we want to watch
+    if (!g_hash_table_contains(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(process->ID))) {
         return;
     }
 
     QWORD pid, tid;
-    get_current_pid_and_tid(cpu_new, &pid, &tid, process);
+    get_current_pid_and_tid(cpu_state, &pid, &tid, process);
     WinThread* current_thread = wi_current_thread(process, tid);
+
     syscall_hook_t* return_hook = &current_thread->syscall_return_hook;
     if(return_hook->active == false){
         // sysret without hooked syscall
         return;
     }
-    pipe_logger_after_syscall_exec(cpu_new, process, return_hook);
+
+    pipe_logger_after_syscall_exec(cpu_state, process, return_hook);
     return_hook->active = false;
 }
 
@@ -341,45 +354,56 @@ void gemu_cb_after_block_translation(CPUState *cpu, TranslationBlock *tb)
         return;
     }
     check_for_unpacking(cpu, tb, process, gemu_instance);
+    if (gemu_use_codecarver) {
+        gemu_dump_code_pages(cpu, process);
+    }
 }
 
+#define KERNEL_SPACE_BOUNDARY 0xffff800000000000
 
-void gemu_cb_phys_memory_written(CPUArchState *env, target_ulong addr, uint64_t val, size_t size, uintptr_t retaddr)
-{
-    CPUState *cpu = env_cpu(env);
-    if (env == NULL || addr > 0xffff800000000000) {
-        return;
-    }
+static bool is_addr_in_cached_section(WinProcess *process, target_ulong addr) {
+    struct Node *cached = process->cache_section_written;
+    return cached != NULL && addr >= cached->start && addr <= cached->end;
+}
 
-    Gemu *gemu_instance = gemu_get_instance();
-
-    WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu, true);
-    if (process == NULL) {
-        // Exit early if the current program is not the one we want to watch
-        return;
-    }
-
-    if(process->cache_section_written != NULL && addr >= process->cache_section_written->start && addr <= process->cache_section_written->end)
-        return;
-    struct Node* section = getNodeForAddress(addr, process->new_sections);
+static struct Node *find_or_refresh_section(CPUState *cpu, WinProcess *process, target_ulong addr) {
+    struct Node *section = getNodeForAddress(addr, process->new_sections);
 
     if (section == NULL) {
         process->cache_section = NULL;
         print_memory_map(cpu, process);
         section = getNodeForAddress(addr, process->new_sections);
     }
+
+    return section;
+}
+
+void gemu_cb_phys_memory_written(CPUArchState *env, target_ulong addr, uint64_t val, size_t size, uintptr_t retaddr)
+{
+    if (env == NULL || addr > KERNEL_SPACE_BOUNDARY) {
+        return;
+    }
+
+    CPUState *cpu = env_cpu(env);
+    Gemu *gemu_instance = gemu_get_instance();
+
+    WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu, true);
+    if (process == NULL) {
+        return;
+    }
+
+    if (is_addr_in_cached_section(process, addr)) {
+        return;
+    }
+
+    struct Node *section = find_or_refresh_section(cpu, process, addr);
     process->cache_section_written = section;
 
-    struct SingleLinkedList* list = getMemoryMappedList(gemu_instance->mapped_sections_waitinglist, process->ID);
-    if (list != NULL) {
-        bool list_is_empty = iterateAndUpdateList(list, process->new_sections);
-        if (list_is_empty == true) {
-            removeList(gemu_instance->mapped_sections_waitinglist, process->ID);
-        }
-    }
+    process_mapped_sections_waitinglist(gemu_instance, process);
 
     if (section != NULL) {
         setWrittenFlag(section, true);
+        process->has_pending_writes = true;
     }
 }
 
@@ -391,8 +415,100 @@ void update_memory_map_from_env(CPUArchState *env){
     Gemu *gemu_instance = gemu_get_instance();
     WinProcess *process = wi_current_process(gemu_instance->win_spec, cpu, true);
     if (process == NULL) {
-        // Exit early if the current program is not the one we want to watch
         return;
     }
     print_memory_map(cpu, process);
+}
+
+#define HASH_SCAN_SIZE 0x400
+
+static uint64_t create_compound_hash(hwaddr start, uint64_t length, const uint8_t *scan_buf, size_t scan_len) {
+    uint64_t content_hash = xxhash64_buf(scan_buf, scan_len);
+
+    return qemu_xxhash64_4(start, length, content_hash, 0);
+}
+
+static bool is_section_already_dumped(Gemu *gemu_instance, hwaddr start, uint64_t length,
+                                       const uint8_t *scan_buf, size_t scan_len) {
+    gpointer hash_key = (gpointer)(uintptr_t)create_compound_hash(start, length, scan_buf, scan_len);
+
+    if (g_hash_table_contains(gemu_instance->dumped_hashes, hash_key))
+        return true;
+
+    g_hash_table_add(gemu_instance->dumped_hashes, hash_key);
+    return false;
+}
+
+static bool dump_section_to_file(CPUState *cpu, struct Node *section, WinProcess *process) {
+    uint64_t length = section->end - section->start;
+    struct timespec now;
+    char filename[261];
+
+    uint8_t *buf = malloc(length);
+
+    gemu_virtual_memory_rw(cpu, section->start, buf, length, false);
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+
+    unsigned long elapsed_ms = (now.tv_sec - start_time->tv_sec) * 1000 +
+                               (now.tv_nsec - start_time->tv_nsec) / 1000000;
+    snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_code_%lu_dump_nr_%d",
+             process->ID, section->start, elapsed_ms, counter);
+    counter++;
+    extracted_data_size += length;
+
+    bool result = gemu_dump_buffer_to_file(buf, length, filename);
+    free(buf);
+    return result;
+}
+
+void gemu_dump_code_pages(CPUState *cpu, WinProcess *process) {
+    if (!process->has_pending_writes) {
+        return;
+    }
+
+    if (counter > MAX_DUMP_COUNT || extracted_data_size > MAX_EXTRACTED_SIZE) {
+        return;
+    }
+
+    process->has_pending_writes = false;
+
+    Gemu *gemu_instance = gemu_get_instance();
+
+    if (process->sections_dirty) {
+        freeList(&process->reduced_sections);
+        process->reduced_sections.head = NULL;
+        copyList(&process->reduced_sections, process->new_sections);
+        reduceList(&process->reduced_sections);
+        process->sections_dirty = false;
+    }
+
+    for (struct Node *current = process->reduced_sections.head; current != NULL; current = current->next) {
+        // Re-check rate limit inside loop
+        if (counter > MAX_DUMP_COUNT || extracted_data_size > MAX_EXTRACTED_SIZE) {
+            break;
+        }
+
+        if (!getWrittenToFlag(current)) {
+            continue;
+        }
+
+        uint64_t length = current->end - current->start;
+
+        size_t scan_len = length < HASH_SCAN_SIZE ? length : HASH_SCAN_SIZE;
+        uint8_t scan_buf[HASH_SCAN_SIZE] = {0};
+
+        int ret = gemu_virtual_memory_rw(cpu, current->start, scan_buf, scan_len, false);
+        if (ret != 0) {
+            fprintf(stderr, "Failed to read memory for hash at 0x%lx\n", current->start);
+            continue;
+        }
+
+        if (is_section_already_dumped(gemu_instance, current->start, length, scan_buf, scan_len)) {
+            continue;
+        }
+
+        dump_section_to_file(cpu, current, process);
+        unsetWrittenFlagForRange(current->start, current->end, process->new_sections);
+    }
 }

@@ -101,6 +101,11 @@ typedef struct
     Bitness bitness;
     void* threads_by_tid;
     target_ulong gsbase; // cache this register value, because it can be zero sometimes
+    // Cached reduced sections list for pecarver optimization
+    struct DoubleLinkedList reduced_sections;
+    bool sections_dirty;
+    // Flag to track if any memory writes occurred since last dump check
+    bool has_pending_writes;
 } WinProcess;
 
 typedef struct {

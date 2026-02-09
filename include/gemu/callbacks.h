@@ -19,7 +19,7 @@ void gemu_cb_tracing(CPUState *cpu, TranslationBlock *tb, bool is_chained);
 
 void update_memory_map_from_env(CPUArchState *env);
 
-void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *thread, Gemu *gemu_instance);
+void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *process, Gemu *gemu_instance);
 
 bool iterateAndUpdateList(struct SingleLinkedList* singleList, struct DoubleLinkedList* doubleList);
 
@@ -34,5 +34,7 @@ void gemu_cb_syscall(CPUX86State *cpu, int next_eip_addend);
 void gemu_cb_sysret(CPUX86State *cpu);
 
 ModuleNode* is_within_range(ModuleNode* head, hwaddr start, hwaddr end);
+
+void gemu_dump_code_pages(CPUState *cpu, WinProcess *process);
 
 #endif //GEMU_CALLBACKS_H
