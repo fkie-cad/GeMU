@@ -108,7 +108,17 @@ void copyList(struct DoubleLinkedList* newList, struct DoubleLinkedList* list) {
 
     struct Node* current = list->head;
     while (current != NULL) {
-        append(newList, current->start, current->end);
+        struct Node* new_node = append(newList, current->start, current->end);
+
+        // Copy the written flag state
+        if (current->is_shared) {
+            new_node->is_shared = true;
+            new_node->written_to.shared_written_to = current->written_to.shared_written_to;
+        } else {
+            new_node->is_shared = false;
+            new_node->written_to.local_written_to = current->written_to.local_written_to;
+        }
+
         current = current->next;
     }
 }
@@ -149,7 +159,7 @@ void copy_written_to_flags(struct DoubleLinkedList* list, struct DoubleLinkedLis
     }
 }
 
-void append(struct DoubleLinkedList* list, hwaddr start, hwaddr end) {
+struct Node* append(struct DoubleLinkedList* list, hwaddr start, hwaddr end) {
     struct Node* newNode = createNode(start, end);
     if (list->head == NULL) {
         list->head = newNode;
@@ -161,6 +171,7 @@ void append(struct DoubleLinkedList* list, hwaddr start, hwaddr end) {
         current->next = newNode;
         newNode->prev = current;
     }
+    return newNode;
 }
 
 void reduceList(struct DoubleLinkedList* list) {
@@ -169,6 +180,10 @@ void reduceList(struct DoubleLinkedList* list) {
         if (current->end >= current->next->start) {
             // Merge adjacent nodes
             current->end = (current->end > current->next->end) ? current->end : current->next->end;
+            // If either node was written to, we need to handle the merge carefully
+            if (getWrittenToFlag(current) || getWrittenToFlag(current->next)) {
+                setWrittenFlag(current, true);
+            }
 
             struct Node* temp = current->next;
             current->next = current->next->next;

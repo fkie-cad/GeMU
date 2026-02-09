@@ -35,6 +35,8 @@ void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_u
 
 void replaceSubstring(char *str, const char *oldSubstr, const char *newSubstr);
 
+bool gemu_dump_buffer_to_file(const uint8_t *buf, size_t length, const char *filename);
+
 char *read_file(const char *filename);
 
 cJSON *parse_file(const char *filename);

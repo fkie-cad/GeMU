@@ -97,12 +97,12 @@ class TestGemuRunnerSingleFile:
     def mock_gemu_instance(self):
         return GemuInstanceMock()
 
-    def gemu_single_file_runner(self, gemu_instance, recipe, tracing=False):
+    def gemu_single_file_runner(self, gemu_instance, recipe, codecarver=False, tracing=False):
         vm_config = self.get_mock_vm_config()
         with patch('datetime.datetime') as mock_datetime:
             mock_now = mock_datetime.now.return_value
             mock_now.strftime.return_value = TIMESTAMP
-            return GemuRunner(UNPACKING_TIME, TRACKINGMODE, DOTNET, vm_config, recipe, gemu_instance, tracing=tracing)
+            return GemuRunner(UNPACKING_TIME, TRACKINGMODE, DOTNET, vm_config, recipe, gemu_instance, codecarver=codecarver, tracing=tracing)
 
     def test_command_without_export(self, tmpdir):
         shutil.copy(SMALL_BITNESS_PE, tmpdir)
@@ -130,7 +130,7 @@ class TestGemuRunnerSingleFile:
         gemu_runner.run_sample()
 
         assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
-                                                    f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET}  -loadvm {SNAPSHOT} "
+                                                    f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} -loadvm {SNAPSHOT} "
                                                     f"-symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
                                                     f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE}"
                                                     f" {IMAGE_PATH}")
@@ -212,6 +212,32 @@ class TestGemuRunnerSingleFile:
         ]
         self.assert_messages_to_gemu(expected, mock_gemu_instance.sent_to_gemu)
 
+    def test_codecarver_flag_included_when_enabled(self, tmpdir):
+        shutil.copy(SMALL_BITNESS_PE, tmpdir)
+        sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
+        mock_gemu_instance = self.mock_gemu_instance()
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe, codecarver=True)
+
+        gemu_runner.run_sample()
+
+        assert "-codecarver" in mock_gemu_instance.params_string
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
+                                                    f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} -codecarver -loadvm {SNAPSHOT} "
+                                                    f"-symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
+                                                    f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} {IMAGE_PATH}")
+
+    def test_codecarver_flag_excluded_when_disabled(self, tmpdir):
+        shutil.copy(SMALL_BITNESS_PE, tmpdir)
+        sample_path = Path(tmpdir) / SMALL_BITNESS_PE.name
+        mock_gemu_instance = self.mock_gemu_instance()
+        recipe = Recipe(USER, sample_path, default_sample_name=SAMPLE_NAME)
+        gemu_runner = self.gemu_single_file_runner(mock_gemu_instance, recipe, codecarver=False)
+
+        gemu_runner.run_sample()
+
+        assert "-codecarver" not in mock_gemu_instance.params_string
+
     def assert_messages_to_gemu(self, expected, actual):
         assert len(actual) == len(expected)
         for i in range(len(actual)):
@@ -219,4 +245,3 @@ class TestGemuRunnerSingleFile:
                 assert "change ide1-cd0" in expected[i]
                 continue
             assert actual[i] == expected[i]
-

@@ -5650,6 +5650,9 @@ SRST
     'auto' will enable bb breaks as soon as dotnet software is detected. If bb breaks are already enabled, this defaults to 'on'.
 ERST
 
+DEF("codecarver", 0, QEMU_OPTION_codecarving, \
+"-codecarver    Activate the codecarving feature of GeMU.\n", QEMU_ARCH_ALL)
+
 DEF("gemutracing", 0, QEMU_OPTION_gemutracing, \
 "-gemutracing    Activate the basic block tracing of GeMU.\n", QEMU_ARCH_ALL)
 SRST

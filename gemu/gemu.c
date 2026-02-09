@@ -615,19 +615,13 @@ void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process, 
     uint8_t *buf = malloc(size + 1);
     extracted_data_size_files += size;
     gemu_virtual_memory_rw(cpu, start, buf, size, false);
-    char filename[100];
+    char filename[261];
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
     int timestamp = (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000;
     sprintf(filename, "dumps/%llu_%u_zwwritevirtualmemory_0x%llx_%u_dump_nr_%d", process->ID, pid, addr, timestamp, file_counter);
     file_counter += 1;
-    mkdir("dumps", 0777);
-    FILE *file = fopen(filename, "wb");
-    if (file != NULL) {
-        fwrite(buf, 1, size, file);
-        fclose(file);
-        printf("Data successfully written to %s\n", filename);
-    }
+    gemu_dump_buffer_to_file(buf, size, filename);
     free(buf);
 }
 
@@ -676,22 +670,14 @@ void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
     uint8_t *buf = malloc(size + 1);
     gemu_virtual_memory_rw(cpu, start, buf, size, false);
     extracted_data_size_files += size;
-    char filename[100];
+    char filename[261];
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
     QWORD filehandle = cJSON_GetObjectItemCaseSensitive(output, "FileHandle")->valueint;
     sprintf(filename, "dumps/%llu_%llu_writtenfile_%lu_nr_%d", process->ID, filehandle,
             (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, file_counter);
     file_counter += 1;
-    mkdir("dumps", 0777);
-    FILE *file = fopen(filename, "wb");
-    if (file != NULL) {
-        fwrite(buf, 1, size, file);
-        fclose(file);
-        printf("Data successfully written to %s\n", filename);
-    } else {
-        perror("Error opening file");
-    }
+    gemu_dump_buffer_to_file(buf, size, filename);
     free(buf);
 }
 
@@ -1388,7 +1374,8 @@ void gemu_init(void) {
             .kernel32_64bit_found = false,
             .modules_to_hook = process_file(symbolmapping),
             .tracking_mode = tracking_mode,
-            .recording = false
+            .recording = false,
+            .dumped_hashes = g_hash_table_new(g_direct_hash, g_direct_equal)
     };
 
     gemu_refresh_tracking_mode(&instance);
@@ -1413,6 +1400,7 @@ void gemu_destroy(void) {
     if (gemu_instance != NULL) {
         hkr_destroy(gemu_instance->hooker);
         wi_destroy(gemu_instance->win_spec);
+        g_hash_table_destroy(gemu_instance->dumped_hashes);
         free(gemu_instance);
         gemu_instance = NULL;
         exit(0);

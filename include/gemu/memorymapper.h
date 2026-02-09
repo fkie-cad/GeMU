@@ -56,7 +56,7 @@ void setWrittenFlag(struct Node* node, bool bit);
 
 void unsetWrittenFlagForRange(hwaddr start, hwaddr end, struct DoubleLinkedList* list);
 
-void append(struct DoubleLinkedList* list, hwaddr start, hwaddr end);
+struct Node* append(struct DoubleLinkedList* list, hwaddr start, hwaddr end);
 
 struct Node* getNodeForAddress(hwaddr addr, struct DoubleLinkedList* list);
 
