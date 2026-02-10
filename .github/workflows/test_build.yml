@@ -1,0 +1,27 @@
+name: Build gemu
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev ninja-build
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          ../configure --target-list=x86_64-softmmu --disable-werror
+
+      - name: Build
+        run: |
+          cd build
+          make -j`nproc`
