@@ -134,6 +134,8 @@ void fill_processinformation32(CPUState *cpu, QWORD value,
     gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
                             sizeof process_info, false);
     printf("NEW PID: %i\n", process_info.dwProcessId);
+    printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n",
+           process->ID, process_info.dwProcessId);
 
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(process_info.dwProcessId), NULL);
@@ -154,6 +156,8 @@ void fill_processinformation64(CPUState *cpu, QWORD value,
     gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
                             sizeof process_info, false);
     printf("NEW PID: %i\n", process_info.dwProcessId);
+    printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n",
+           process->ID, process_info.dwProcessId);
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(process_info.dwProcessId), NULL);
     cJSON_AddNumberToObject(processinformation, "ProcessId",
@@ -474,6 +478,8 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
     }
 
     target_ulong process_handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
+    printf("PROCESS_CREATED parent=%llu child=%llu image=unknown\n",
+           process->ID, client_id.ProcessId);
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
                         GINT_TO_POINTER(client_id.ProcessId), NULL);
     g_hash_table_insert(process->process_handles, GINT_TO_POINTER((int)process_handle), GINT_TO_POINTER((int)client_id.ProcessId));
@@ -900,6 +906,18 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     QWORD tid;
     get_current_pid_and_tid(cpu, &pid, &tid, process);    
     printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
+
+    if (strstr(func_name, "CreateProcess") != NULL) {
+        cJSON *cmd = cJSON_GetObjectItemCaseSensitive(output, "lpCommandLine");
+        if (cmd == NULL)
+            cmd = cJSON_GetObjectItemCaseSensitive(output, "CommandLine");
+        cJSON *app = cJSON_GetObjectItemCaseSensitive(output, "lpApplicationName");
+        if (app == NULL)
+            app = cJSON_GetObjectItemCaseSensitive(output, "ApplicationName");
+        const char *command = (cmd && cmd->valuestring && cmd->valuestring[0]) ? cmd->valuestring :
+                              (app && app->valuestring && app->valuestring[0]) ? app->valuestring : "unknown";
+        printf("PROCESS_CREATING parent=%llu command=%s\n", pid, command);
+    }
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);

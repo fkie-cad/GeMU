@@ -93,6 +93,7 @@ bool is_process_excluded(WindowsIntrospecter *w, WinProcess *p) {
       Gemu *gemu = gemu_get_instance();
       g_hash_table_insert(gemu->pids_to_lookout_for, (gpointer)p->ID,
                           NULL);
+      printf("NEW PID: %llu\n", p->ID);
       g_print("Including ASID %lu program=%s\n", p->ASID,
               p->ImagePathName);
       if (start_time == NULL) {
@@ -171,8 +172,10 @@ void print_memory_map(CPUState *cpu, WinProcess *process) {
       (struct DoubleLinkedList *)malloc(sizeof(struct DoubleLinkedList));
   latest_sections->head = NULL;
   get_memory_map(cpu->env_ptr, latest_sections);
-  if (latest_sections->head == NULL)
+  if (latest_sections->head == NULL) {
+    free(latest_sections);
     return;
+  }
 
   // struct DoubleLinkedList new_sections;
   // new_sections.head = NULL;
@@ -183,6 +186,7 @@ void print_memory_map(CPUState *cpu, WinProcess *process) {
   process->cache_section = NULL;
   process->cache_section_written = NULL;
   freeList(process->new_sections);
+  free(process->new_sections);
   process->new_sections = latest_sections;
   // Mark sections as dirty so reduced_sections cache is rebuilt
   process->sections_dirty = true;
@@ -236,10 +240,6 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
   guest_wstrncpy(cpu, imagePathName, processParameters.ImagePathName.u.Length,
                  processParameters.ImagePathName.Buffer);
 
-  struct DoubleLinkedList *list =
-      (struct DoubleLinkedList *)malloc(sizeof(struct DoubleLinkedList));
-  list->head = NULL;
-
   struct DoubleLinkedList *new_sections =
       (struct DoubleLinkedList *)malloc(sizeof(struct DoubleLinkedList));
   new_sections->head = NULL;
@@ -267,7 +267,6 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
   };
   newThread.is_excluded = is_process_excluded(w, &newThread);
   *newThreadPtr = newThread;
-  newThreadPtr->new_sections = list;
 
   return newThreadPtr;
 }

@@ -6,6 +6,11 @@ from gemuinteractor.gemu_run_decorator import RunDecorator, YaraEarlyExiter, Wri
 from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
 from gemuinteractor.recipe import Recipe
+from postprocessing import (
+    PostProcessingPipeline, DumpIndexer, SimilarityGrouper,
+    ProcessTreeBuilder, YaraScanner, DumpExtractor,
+)
+
 
 
 def unpack_single_file(
@@ -20,6 +25,7 @@ def unpack_single_file(
     recipe: Path | str | None = None,
     codecarver: bool = False,
     tracing: bool = False,
+    postprocess: bool = True,
 ) -> AnalysisFolder:
     vm_config = get_vm_settings(config)
 
@@ -44,8 +50,29 @@ def unpack_single_file(
     runner.decorate_run(decorators)
 
     runner.run_sample()
+
     analysis_folder.zip_dumps_folder()
+    if postprocess:
+        _run_postprocessing(analysis_folder, yararules)
+        DumpExtractor(analysis_folder).extract()
     return analysis_folder
+
+
+def _run_postprocessing(analysis_folder: AnalysisFolder, yara_rules_path: Path|str|None) -> None:
+    print("Running post-processing pipeline...")
+    yara_path = Path(yara_rules_path) if yara_rules_path else None
+    pipeline = PostProcessingPipeline([
+        DumpIndexer(),
+        SimilarityGrouper(),
+        ProcessTreeBuilder(),
+        YaraScanner(),
+    ])
+    manifest = pipeline.run(analysis_folder, yara_rules_path=yara_path)
+    print(f"Post-processing complete. Indexed {manifest.get('dump_count', 0)} "
+          f"dumps, {manifest.get('process_count', 0)} processes.")
+    if manifest.get("errors"):
+        for error in manifest["errors"]:
+            print(f"Post-processing error: {error}")
 
 
 def existing_path(path_str: str) -> Path:
@@ -62,7 +89,6 @@ def optional_existing_path(path_str: str) -> Path | None:
 
 
 def cli_main() -> None:
-    """CLI entry point that handles argument parsing."""
     parser = argparse.ArgumentParser(description="GEMU malware analysis tool")
 
     parser.add_argument("--sample", help="The sample to be executed", required=True, type=existing_path)
@@ -77,7 +103,13 @@ def cli_main() -> None:
     parser.add_argument("--recipe", help="Path to specific recipe file", type=optional_existing_path, default=None)
     parser.add_argument("--tracing", help="Activate BasicBlock tracing in GeMU", action="store_true")
     parser.add_argument("--codecarver", help="Activate the codecarving feature", action="store_true", default=False)
-    
+    parser.add_argument(
+        "--postprocess",
+        help="Run post-processing pipeline (default: True)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+
     args = parser.parse_args()
 
     unpack_single_file(
@@ -92,6 +124,7 @@ def cli_main() -> None:
         recipe=args.recipe,
         codecarver=args.codecarver,
         tracing=args.tracing,
+        postprocess=args.postprocess,
     )
 
 

@@ -140,7 +140,7 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
     struct Node* temp_section = NULL;
 
     if (process->cache_section == NULL || !(cpu->env_ptr->eip >= process->cache_section->start && cpu->env_ptr->eip < process->cache_section->end)){
-        struct Node* temp_section = getNodeForAddress(cpu->env_ptr->eip, process->new_sections);
+        temp_section = getNodeForAddress(cpu->env_ptr->eip, process->new_sections);
         process->cache_section = temp_section;
     }
     else {
@@ -165,6 +165,9 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
             removeList(gemu_instance->mapped_sections_waitinglist, process->ID);
         }
     }
+    if (temp_section == NULL) {
+        return;
+    }
     if (getWrittenToFlag(temp_section)) {
         struct DoubleLinkedList new_list;
         copyList(&new_list, process->new_sections);
@@ -186,11 +189,11 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
         wi_extract_module_list(cpu, process);
         ModuleNode* module = is_within_range(process->current_modules, temp_section->start, temp_section->end);
         if (module != NULL) {
-            sprintf(filename, "dumps/%llu_0x%lx_%s_%lu_dump_nr_%d", process->ID, section->start, module->file,
+            snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_%s_%lu_dump_nr_%d", process->ID, section->start, module->file,
                     (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
         }
         else{
-            sprintf(filename, "dumps/%llu_0x%lx_mw_%lu_dump_nr_%d", process->ID, section->start, (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
+            snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_mw_%lu_dump_nr_%d", process->ID, section->start, (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
         }
         unsetWrittenFlagForRange(section->start, section->end, process->new_sections);
         counter += 1;
@@ -408,8 +411,11 @@ void gemu_cb_phys_memory_written(CPUArchState *env, target_ulong addr, uint64_t 
 }
 
 void update_memory_map_from_env(CPUArchState *env){
+    if (env == NULL) {
+        return;
+    }
     CPUState *cpu = env_cpu(env);
-    if (env == NULL || in_kernel_mode(cpu)) {
+    if (in_kernel_mode(cpu)) {
         return;
     }
     Gemu *gemu_instance = gemu_get_instance();

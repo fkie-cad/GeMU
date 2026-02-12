@@ -12,11 +12,15 @@ from pathlib import Path
 from typing import Iterable
 
 class AnalysisFolder:
-    def __init__(self, runname: str, input_binary: Path|str):
-        self.analysis_folder = self._build_analysis_folder(runname, str(input_binary))
+    def __init__(self, runname: str|None = None, input_binary: Path|str|None = None, existing: Path|str|None = None):
+        if existing:
+            self.analysis_folder = Path(existing)
+        else:
+            self.analysis_folder = self._build_analysis_folder(runname, str(input_binary))
         self.runlog = self.analysis_folder / "runlog"
         self.dumps_folder = self.analysis_folder / "dumps"
         self.dumps_zip = self.analysis_folder / "dumps.zip"
+        self.dumps_json = self.analysis_folder / "dumps.json"
 
     def _build_analysis_folder(self, runname: str, input_binary: str) -> Path:
         analysis_folder = Path(
@@ -31,6 +35,7 @@ class AnalysisFolder:
             subprocess.run(f"sync '{self.dumps_folder}'", shell=True)
             shutil.make_archive(str(self.dumps_folder), "zip", str(self.dumps_folder))
             shutil.rmtree(self.dumps_folder, ignore_errors=True)
+
 
 # Not in function def for efficiency
 KEYMAP = {

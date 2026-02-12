@@ -26,11 +26,8 @@ char* getFileName(char* path) {
     char* lastBackslash = strrchr(path, '\\');
     if (lastBackslash != NULL) {
         // Return the part of the string after the last backslash
-        printf("i am returning %s", lastBackslash + 1);
         return lastBackslash + 1;
     } else {
-        // If there is no backslash, return the whole path
-        printf("I am returning  the whole path\n");
         return path;
     }
 }
@@ -47,30 +44,6 @@ struct Node* createNode(hwaddr start, hwaddr end) {
     return newNode;
 }
 
-struct DoubleLinkedList* getNodesInRange(hwaddr start, hwaddr size, struct DoubleLinkedList* list) {
-    struct DoubleLinkedList* result = (struct DoubleLinkedList*)malloc(sizeof(struct DoubleLinkedList));
-    result->head = NULL;
-
-    hwaddr end = start + size;
-    struct Node* current = list->head;
-
-    while (current != NULL) {
-        if (current->end > start && current->start < end) {
-            // Node overlaps with the specified range
-            append(result, current->start, current->end);
-            // Copy the written_to flag (shared or local)
-            result->head->is_shared = current->is_shared;
-            if (current->is_shared) {
-                result->head->written_to.shared_written_to = current->written_to.shared_written_to;
-            } else {
-                result->head->written_to.local_written_to = current->written_to.local_written_to;
-            }
-        }
-        current = current->next;
-    }
-
-    return result;
-}
 
 void setWrittenFlag(struct Node* node, bool bit) {
     if (node->is_shared) {

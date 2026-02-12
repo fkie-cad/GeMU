@@ -50,8 +50,6 @@ void convertToSharedWrittenTo(struct Node* node, bool* shared_written_to);
 
 bool getWrittenToFlag(struct Node* node);
 
-struct DoubleLinkedList* getNodesInRange(hwaddr start, hwaddr size, struct DoubleLinkedList* list);
-
 void setWrittenFlag(struct Node* node, bool bit);
 
 void unsetWrittenFlagForRange(hwaddr start, hwaddr end, struct DoubleLinkedList* list);
