@@ -209,6 +209,7 @@ WinThread *wi_current_thread(WinProcess *process, QWORD tid) {
     if (!thread) {
         thread = malloc(sizeof(WinThread));
         thread->syscall_return_hook.active = false;
+        thread->syscall_return_hook.in_parameters = NULL;
         thread->base_last_bb = 0;
         thread->length_last_bb = 0;
         g_hash_table_insert(process->threads_by_tid, GINT_TO_POINTER(tid), thread);

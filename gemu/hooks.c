@@ -63,6 +63,9 @@ bool hkr_remove_hook(Hooker *h, target_ulong pc)
     }
     bool result = qht_remove(h->addr_symbol_map, found_hook, pc);
     if (result){
+        if (found_hook->in_parameters) {
+            cJSON_Delete(found_hook->in_parameters);
+        }
         free(found_hook);
     }
     return result;
@@ -101,8 +104,7 @@ bool hkr_try_exec_hook(Hooker *h, target_ulong address, CPUState *cpu, Translati
         return false;
     }
 
-    int n = found_hook->out_parameter_list.number_of_outparameters;
-    cb_func(address, cpu, tb, found_hook->dll_name, found_hook->func_name, process, found_hook->out_parameter_list.out_parameters, n, found_hook->is32bit);
+    cb_func(address, cpu, tb, found_hook, process);
     return true;
 }
 

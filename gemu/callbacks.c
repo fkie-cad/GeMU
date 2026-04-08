@@ -1,4 +1,3 @@
-#define USE_SYSCALL_NAMES
 #include "gemu/callbacks.h"
 #include "gemu/fastcheck.h"
 #include "gemu/mappedwaitinglist.h"
