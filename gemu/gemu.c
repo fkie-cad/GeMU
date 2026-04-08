@@ -21,10 +21,7 @@ extern bool gemu_use_syscall;
 extern bool gemu_compile_syscall_helper;
 
 static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
-                                       TranslationBlock *tb, const char *dll_name,
-                                       const char *func_name, WinProcess *process,
-                                       out_parameter out_parameters[],
-                                       int number_of_outparameters, bool is32bit);
+                                       TranslationBlock *tb, hook_t *hook, WinProcess *process);
 
 
 
@@ -495,7 +492,7 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
     const char* func_name = SYSCALL_NAMES[hook->syscall_enum];
     const char* dll_name = "syscall";
     out_parameter* out_parameters = hook->out_parameter_list.out_parameters;
-    
+
 
     cJSON *output;
     if (is32bit) {
@@ -504,6 +501,21 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
     } else {
         output = read_out_parameters64(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
+    }
+
+    // Merge in-parameters from entry into the output
+    if (hook->in_parameters) {
+        cJSON *item = hook->in_parameters->child;
+        while (item) {
+            cJSON *next = item->next;
+            if (!cJSON_GetObjectItemCaseSensitive(output, item->string)) {
+                cJSON_DetachItemViaPointer(hook->in_parameters, item);
+                cJSON_AddItemToObject(output, item->string, item);
+            }
+            item = next;
+        }
+        cJSON_Delete(hook->in_parameters);
+        hook->in_parameters = NULL;
     }
 
     QWORD pid;                                                                                                                                                                     
@@ -534,15 +546,17 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 
 
 static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
-                                      TranslationBlock *tb, const char *dll_name,
-                                      const char *func_name, WinProcess *process,
-                                      out_parameter out_parameters[],
-                                      int number_of_outparameters, bool is32bit) {
+                                      TranslationBlock *tb, hook_t *hook, WinProcess *process) {
     CPUX86State *env = cpu->env_ptr;
     target_ulong ret = env->regs[R_EAX];
     Gemu *gemu = gemu_get_instance();
+    const char *func_name = hook->func_name;
+    const char *dll_name = hook->dll_name;
+    int number_of_outparameters = hook->out_parameter_list.number_of_outparameters;
+    out_parameter *out_parameters = hook->out_parameter_list.out_parameters;
+
     cJSON *output;
-    if (is32bit) {
+    if (hook->is32bit) {
         output = read_out_parameters32(gemu, cpu, func_name, dll_name,
                                        number_of_outparameters, out_parameters, process);
     } else {
@@ -550,9 +564,22 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
                                        number_of_outparameters, out_parameters, process);
     }
 
-    QWORD pid;                                                                                                                                                                     
+    // Merge in-parameters from entry into the output
+    if (hook->in_parameters) {
+        cJSON *item = hook->in_parameters->child;
+        while (item) {
+            cJSON *next = item->next;
+            if (!cJSON_GetObjectItemCaseSensitive(output, item->string)) {
+                cJSON_DetachItemViaPointer(hook->in_parameters, item);
+                cJSON_AddItemToObject(output, item->string, item);
+            }
+            item = next;
+        }
+    }
+
+    QWORD pid;
     QWORD tid;
-    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    get_current_pid_and_tid(cpu, &pid, &tid, process);
     printf("%llu:%llu:$-%s -> %li\n", pid, tid, cJSON_PrintUnformatted(output), ret);
 
     //load library is always interesting, for DOTNET and WINAPI case
@@ -573,7 +600,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
 
     if (gemu_instance->tracking_mode & TRACKING_BASICBLOCK_DOTNET){
         if (unlikely(strncmp(func_name, "getJit", 6) == 0)) {
-            handle_getJit_exit(gemu, ret, cpu, is32bit);
+            handle_getJit_exit(gemu, ret, cpu, hook->is32bit);
         }
         if (strcmp(func_name, "compileMethod") == 0) {
             int native_address = cJSON_GetObjectItemCaseSensitive(output, "nativeEntry")->valueint;
@@ -582,6 +609,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
     }
 
     cJSON_Delete(output);
+    // in_parameters is freed by hkr_remove_hook via cJSON_Delete on the hook
     hkr_remove_hook(gemu->hooker, pc);
 }
 
@@ -852,23 +880,28 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
     }
 
     printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
-    cJSON_Delete(output);
+    cJSON_DeleteItemFromObjectCaseSensitive(output, "func");
+    cJSON_DeleteItemFromObjectCaseSensitive(output, "dll_name");
+    hook_ptr->in_parameters = output;
+    // output is now owned by the hook's in_parameters — freed at exit
 }
 
 
 static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
-                                       TranslationBlock *tb, const char *dll_name,
-                                       const char *func_name, WinProcess *process,
-                                       out_parameter out_parameters[],
-                                       int number_of_outparameters, bool is32bit) {
+                                       TranslationBlock *tb, hook_t *hook, WinProcess *process) {
 
     Gemu *gemu_instance = gemu_get_instance();
+    const char *dll_name = hook->dll_name;
+    const char *func_name = hook->func_name;
+    bool is32bit = hook->is32bit;
+
     hook_t newHook = {.addr = 0,
             .callbacks = NULL,
             .callback_count = 0,
             .dll_name = "",
             .func_name = "",
             .out_parameter_list.number_of_outparameters = -2,
+            .in_parameters = NULL,
             .is32bit = is32bit};
 
     if (unlikely(strncmp(func_name, "Zw", 2) == 0)) {
@@ -902,9 +935,9 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook.out_parameter_list, process);
     }
 
-    QWORD pid;                                                                                                                                                                     
+    QWORD pid;
     QWORD tid;
-    get_current_pid_and_tid(cpu, &pid, &tid, process);    
+    get_current_pid_and_tid(cpu, &pid, &tid, process);
     printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
 
     if (strstr(func_name, "CreateProcess") != NULL) {
@@ -923,6 +956,12 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);
     }
 
+    // Remove func and dll_name from output before storing as in_parameters
+    // (these are already in the hook struct and will be re-added at exit)
+    cJSON_DeleteItemFromObjectCaseSensitive(output, "func");
+    cJSON_DeleteItemFromObjectCaseSensitive(output, "dll_name");
+    newHook.in_parameters = output;
+
     if (hkr_add_new_hook(gemu_instance->hooker, newHook) && newHook.addr != 0) {
         fc_set(&gemu_instance->hooker->fc, newHook.addr);
     }
@@ -932,7 +971,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
             handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, 0, pipe_logger_before_tb_exec);
         }
     }
-    cJSON_Delete(output);
+    // output is now owned by the hook's in_parameters — freed at exit
 }
 
 
@@ -1175,6 +1214,7 @@ static gboolean read_dynamic_symbols_txt(const GPtrArray *function_entries, targ
                     .dll_name = "",
                     .func_name = "",
                     .out_parameter_list.number_of_outparameters = -1,
+                    .in_parameters = NULL,
                     .is32bit = false};
 
             g_utf8_strncpy(newHook.dll_name, parts[IdxInLineDLLName],
@@ -1237,7 +1277,8 @@ gboolean hook_address(const char* func_name, const char *dll_name, target_long a
             .callback_count = 0,
             .dll_name = "",
             .func_name = "",
-            .out_parameter_list.number_of_outparameters = -1};
+            .out_parameter_list.number_of_outparameters = -1,
+            .in_parameters = NULL};
 
 
     g_utf8_strncpy(newHook.dll_name, dll_name,

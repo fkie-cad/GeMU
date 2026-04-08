@@ -8,6 +8,7 @@
 #include "qemu/typedefs.h"
 #include "win_spector.h"
 #include "fastcheck.h"
+#include "cJSON.h"
 
 // New callbacks can be added here:
 enum callback
@@ -30,13 +31,13 @@ typedef struct
     int callback_count;
 
     out_parameter_list_t out_parameter_list;
+    cJSON *in_parameters;
     char dll_name[256];
     char func_name[256];
     bool is32bit;
 } hook_t;
 
-typedef void (*hook_callback_func)(target_ulong pc, CPUState *cpu, TranslationBlock *tb, char *dll_name,
-                                   char *func_name, WinProcess *process, out_parameter out_parameters[], int number_of_outparameters, bool is32bit);
+typedef void (*hook_callback_func)(target_ulong pc, CPUState *cpu, TranslationBlock *tb, hook_t *hook, WinProcess *process);
 
 typedef struct
 {

@@ -12,6 +12,7 @@
 #include "glib.h"
 #include "memorymapper.h"
 #include "gemu/syscallenums.h"
+#include "gemu/cJSON.h"
 
 typedef QWORD PVOID, PUNICODE_STRING, PWSTR_;
 typedef WORD USHORT;
@@ -78,6 +79,7 @@ typedef struct
 typedef struct
 {
     out_parameter_list_t out_parameter_list;
+    cJSON *in_parameters;
     bool active;
     // char func_name[256];
     syscall_t syscall_enum;
