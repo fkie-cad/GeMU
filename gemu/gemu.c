@@ -1,5 +1,6 @@
 #define USE_SYSCALL_NAMES
 #include "gemu/gemu.h"
+#include "gemu/calling_conventions.h"
 #include "gemu/cJSON.h"
 #include "gemu/fastcheck.h"
 #include "gemu/memorymapper.h"
@@ -95,36 +96,6 @@ bool is_parameter_type_in(char *type, const char *types[]) {
         i++;
     }
     return false;
-}
-
-DWORD get_parameter32(CPUState *cpu, int index) {
-    DWORD result;
-    gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP] + (4 + index * 4),
-                             (uint8_t * ) & result, 4);
-    return result;
-}
-
-QWORD get_parameter64(CPUState *cpu, int index) {
-    QWORD result;
-    switch (index) {
-        case 0:
-            result = cpu->env_ptr->regs[R_ECX];
-            break;
-        case 1:
-            result = cpu->env_ptr->regs[R_EDX];
-            break;
-        case 2:
-            result = cpu->env_ptr->regs[8];
-            break;
-        case 3:
-            result = cpu->env_ptr->regs[9];
-            break;
-        default:
-            gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP] + (8 + index * 8),
-                                     (uint8_t * ) & result, 8);
-            break;
-    }
-    return result;
 }
 
 int count_dereferences(char *s) {

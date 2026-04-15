@@ -6,6 +6,7 @@
 #include "hooks.h"
 #include "utils.h"
 #include "win_spector.h"
+#include "calling_conventions.h"
 #include <time.h>
 
 typedef enum {
@@ -95,10 +96,6 @@ void fill_processinformation64(CPUState *cpu, QWORD value,
 
 void fill_processinformation32(CPUState *cpu, QWORD value,
                                cJSON *processinformation, WinProcess *process);
-
-QWORD get_parameter64(CPUState *cpu, int index);
-
-DWORD get_parameter32(CPUState *cpu, int index);
 
 bool is_parameter_type_in(char *type, const char *types[]);
 
