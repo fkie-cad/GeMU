@@ -77,25 +77,16 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process,
 
 void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process);
 
-cJSON *read_out_parameters64(Gemu *gemu, CPUState *cpu, const char *func_name,
-                             const char *dll_name, int number_of_outparameters,
-                             out_parameter out_parameters[], WinProcess *process);
+cJSON *read_out_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
+                           const char *dll_name, int number_of_outparameters,
+                           out_parameter out_parameters[], WinProcess *process, bool is32bit);
 
-cJSON *read_out_parameters32(Gemu *gemu, CPUState *cpu, const char *func_name,
-                             const char *dll_name, int number_of_outparameters,
-                             out_parameter out_parameters[], WinProcess *process);
+cJSON *read_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
+                       const char *dll_name, out_parameter_list_t *out_parameter_list,
+                       WinProcess *process, bool is32bit);
 
-cJSON *read_parameters32(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
-                         const char *dll_name, out_parameter_list_t* out_parameter_list, WinProcess *process);
-
-cJSON *read_parameters64(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
-                         const char *dll_name, out_parameter_list_t *out_parameter_list, WinProcess *process);
-
-void fill_processinformation64(CPUState *cpu, QWORD value,
-                               cJSON *processinformation, WinProcess *process);
-
-void fill_processinformation32(CPUState *cpu, QWORD value,
-                               cJSON *processinformation, WinProcess *process);
+void fill_processinformation(CPUState *cpu, QWORD value, cJSON *processinformation,
+                             WinProcess *process, bool is32bit);
 
 bool is_parameter_type_in(char *type, const char *types[]);
 
