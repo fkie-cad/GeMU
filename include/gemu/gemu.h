@@ -58,19 +58,21 @@ void gemu_destroy(void);
 
 bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_name,
                          const char *func_name, WinProcess *process, out_parameter_list_t* out_parameter_list,
-                         bool is32Bit);
+                         CallingConvention cc);
 
 void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
                         const char *dll_name, const char *func_name, out_parameter_list_t* out_parameter_list,
-                        bool is32Bit);
+                        CallingConvention cc);
 
 void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
                                  WinProcess *process, const char *dll_name,
-                                 const char *func_name, out_parameter_list_t* out_parameter_list, bool is32Bit);
+                                 const char *func_name, out_parameter_list_t* out_parameter_list,
+                                 CallingConvention cc);
 
 void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
                                WinProcess *process, const char *dll_name,
-                               const char *func_name, out_parameter_list_t* out_parameter_list, bool is32Bit);
+                               const char *func_name, out_parameter_list_t* out_parameter_list,
+                               CallingConvention cc);
 
 void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process,
                                     cJSON *output);
@@ -79,11 +81,12 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process);
 
 cJSON *read_out_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
                            const char *dll_name, int number_of_outparameters,
-                           out_parameter out_parameters[], WinProcess *process, bool is32bit);
+                           out_parameter out_parameters[], WinProcess *process,
+                           CallingConvention cc);
 
 cJSON *read_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
                        const char *dll_name, out_parameter_list_t *out_parameter_list,
-                       WinProcess *process, bool is32bit);
+                       WinProcess *process, CallingConvention cc);
 
 
 
@@ -121,7 +124,7 @@ void gemu_start_recording(void);
 
 gboolean hook_address(const char* func_name, const char *dll_name, target_long address, void* function);
 
-void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu, bool is32bit);
+void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu, CallingConvention cc);
 
 void handle_loaded_library(ModuleNode *head);
 

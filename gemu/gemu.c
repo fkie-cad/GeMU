@@ -62,7 +62,7 @@ QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit) {
 
 cJSON *read_parameters(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
                        const char *dll_name, out_parameter_list_t *out_parameter_list,
-                       WinProcess *process, bool is32bit) {
+                       WinProcess *process, CallingConvention cc) {
     cJSON *output = cJSON_CreateObject();
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
@@ -75,9 +75,9 @@ cJSON *read_parameters(Gemu *gemu_instance, CPUState *cpu, const char *func_name
     int outparameter = 0;
     for (int i = 0; i < function_entry->num_parameters; i++) {
         FunctionParameter *parameter = &function_entry->parameters[i];
-        QWORD value = get_parameter(cpu, i, is32bit ? CC_STDCALL_32 : CC_WIN64);
+        QWORD value = get_parameter(cpu, i, cc);
         if (is_in_parameter(parameter)) {
-            dispatch_type_handler(cpu, parameter, value, output, process, is32bit);
+            dispatch_type_handler(cpu, parameter, value, output, process, cc_is32bit(cc));
         }
         if (is_out_parameter(parameter)) {
             out_parameter_list->out_parameters[outparameter].address = value;
@@ -91,7 +91,8 @@ cJSON *read_parameters(Gemu *gemu_instance, CPUState *cpu, const char *func_name
 
 cJSON *read_out_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
                            const char *dll_name, int number_of_outparameters,
-                           out_parameter out_parameters[], WinProcess *process, bool is32bit) {
+                           out_parameter out_parameters[], WinProcess *process,
+                           CallingConvention cc) {
     cJSON *output = cJSON_CreateObject();
     cJSON_AddStringToObject(output, "func", func_name);
     cJSON_AddStringToObject(output, "dll_name", dll_name);
@@ -106,7 +107,7 @@ cJSON *read_out_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
     for (int i = 0; i < number_of_outparameters; i++) {
         FunctionParameter *parameter = &function_entry->parameters[out_parameters[i].parameter_number];
         QWORD addr = out_parameters[i].address;
-        dispatch_type_handler(cpu, parameter, addr, output, process, is32bit);
+        dispatch_type_handler(cpu, parameter, addr, output, process, cc_is32bit(cc));
     }
     return output;
 }
@@ -202,18 +203,16 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
 }
 
 void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_hook_t* hook) {
-    CPUX86State *env = cpu->env_ptr;
-    target_ulong ret = env->regs[R_EAX];
+    target_ulong ret = get_return_value(cpu, CC_SYSCALL_64);
     Gemu *gemu = gemu_get_instance();
     int number_of_outparameters = hook->out_parameter_list.number_of_outparameters;
-    bool is32bit = false;
     const char* func_name = SYSCALL_NAMES[hook->syscall_enum];
     const char* dll_name = "syscall";
     out_parameter* out_parameters = hook->out_parameter_list.out_parameters;
 
-
     cJSON *output = read_out_parameters(gemu, cpu, func_name, dll_name,
-                                        number_of_outparameters, out_parameters, process, is32bit);
+                                        number_of_outparameters, out_parameters, process,
+                                        CC_SYSCALL_64);
 
     // Merge in-parameters from entry into the output
     if (hook->in_parameters) {
@@ -259,8 +258,7 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 
 static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
                                       TranslationBlock *tb, hook_t *hook, WinProcess *process) {
-    CPUX86State *env = cpu->env_ptr;
-    target_ulong ret = env->regs[R_EAX];
+    target_ulong ret = get_return_value(cpu, hook->cc);
     Gemu *gemu = gemu_get_instance();
     const char *func_name = hook->func_name;
     const char *dll_name = hook->dll_name;
@@ -268,7 +266,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
     out_parameter *out_parameters = hook->out_parameter_list.out_parameters;
 
     cJSON *output = read_out_parameters(gemu, cpu, func_name, dll_name,
-                                        number_of_outparameters, out_parameters, process, hook->is32bit);
+                                        number_of_outparameters, out_parameters, process, hook->cc);
 
     // Merge in-parameters from entry into the output
     if (hook->in_parameters) {
@@ -306,7 +304,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
 
     if (gemu_instance->tracking_mode & TRACKING_BASICBLOCK_DOTNET){
         if (unlikely(strncmp(func_name, "getJit", 6) == 0)) {
-            handle_getJit_exit(gemu, ret, cpu, hook->is32bit);
+            handle_getJit_exit(gemu, ret, cpu, hook->cc);
         }
         if (strcmp(func_name, "compileMethod") == 0) {
             int native_address = cJSON_GetObjectItemCaseSensitive(output, "nativeEntry")->valueint;
@@ -321,9 +319,10 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
 
 void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
                                  WinProcess *process, const char *dll_name,
-                                 const char *func_name, out_parameter_list_t *out_parameter_list, bool is32Bit) {
+                                 const char *func_name, out_parameter_list_t *out_parameter_list,
+                                 CallingConvention cc) {
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
-                                    out_parameter_list, process, is32Bit);
+                                    out_parameter_list, process, cc);
     int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
     // This is hacky, but in most cases, handle 7 is the current process
     if ((handle == 0) || (handle == 7)) { 
@@ -363,9 +362,10 @@ void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process, 
 
 void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
                                  WinProcess *process, const char *dll_name,
-                                 const char *func_name, out_parameter_list_t *out_parameter_list, bool is32Bit) {
+                                 const char *func_name, out_parameter_list_t *out_parameter_list,
+                                 CallingConvention cc) {
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
-                                    out_parameter_list, process, is32Bit);
+                                    out_parameter_list, process, cc);
     int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         int pid = GPOINTER_TO_INT(g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle)));
@@ -382,9 +382,9 @@ void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
 
 void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
                         const char *dll_name, const char *func_name, out_parameter_list_t *out_parameter_list,
-                        bool is32Bit) {
+                        CallingConvention cc) {
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
-                                    out_parameter_list, process, is32Bit);
+                                    out_parameter_list, process, cc);
 
     if (file_counter > 10000 ||  extracted_data_size_files > 10e+9) {
         return;
@@ -411,18 +411,18 @@ void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
 
 static void handle_NtOpenFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
                         const char *dll_name, const char *func_name, out_parameter_list_t *out_parameter_list,
-                        bool is32Bit) {
+                        CallingConvention cc) {
 
     if (!(gemu_instance->tracking_mode & TRACKING_ACTIVATE_DOTNET_BB_IF_FOUND)){
         return;
     }
 
-    // printf("I'm in NtOpenFile\n");
+    // printf("I'm in NtOpenFile\n")
     OBJECT_ATTRIBUTES attributes;
     UNICODE_STRING object_name;
 
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
-                                    out_parameter_list, process, is32Bit);
+                                    out_parameter_list, process, cc);
 
     QWORD attributes_addr = cJSON_GetObjectItemCaseSensitive(output, "ObjectAttributes")->valueint;
 
@@ -453,7 +453,7 @@ static void handle_NtOpenFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *pr
 
 bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_name,
                          const char *func_name, WinProcess *process, out_parameter_list_t *out_parameter_list,
-                         bool is32Bit) {
+                         CallingConvention cc) {
     if (!(gemu_instance->tracking_mode & TRACKING_BASICBLOCK_WINAPI)){
         return false;
     }
@@ -461,7 +461,7 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
     if (strcmp(func_name, "ZwTerminateProcess") == 0) {
         // printf("handling a special API %s for ZwTerminateProcess\n", func_name);
         handle_ZwTerminateProcess(gemu_instance, cpu, process, dll_name, func_name,
-                                  out_parameter_list, is32Bit);
+                                  out_parameter_list, cc);
         return true;
     }
     if (strcmp(func_name, "ZwOpenProcess") == 0) {
@@ -471,7 +471,7 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
     if (strcmp(func_name, "ZwWriteVirtualMemory") == 0) {
         // printf("handling a special API %s for ZwWriteVirtualMemory\n", func_name);
         handle_ZwWriteVirtualMemory(gemu_instance, cpu, process, dll_name,
-                                    func_name, out_parameter_list, is32Bit);
+                                    func_name, out_parameter_list, cc);
     }
     if (strcmp(func_name, "ZwAllocateVirtualMemory") == 0) {
         // printf("handling a special API %s for ZwAllocateVirtualMemory\n", func_name);
@@ -479,7 +479,7 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
     }
     if (strcmp(func_name, "ZwWriteFile") == 0) {
         // printf("handling a special API %s for ZwWriteFile\n", func_name);
-        handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name, out_parameter_list, is32Bit);
+        handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name, out_parameter_list, cc);
         return true;
     }
     if (strcmp(func_name, "ZwMapViewOfSection") == 0) {
@@ -491,13 +491,13 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
 
 static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu, const char *dll_name,
                          syscall_t syscall, WinProcess *process, syscall_hook_t *hook,
-                         bool is32Bit) {
+                         CallingConvention cc) {
     const char* func_name = SYSCALL_NAMES[syscall];
     switch (syscall){
-        case NtTerminateProcess: 
+        case NtTerminateProcess:
             // printf("handling a special API %s for NtTerminateProcess\n", func_name);
             handle_ZwTerminateProcess(gemu_instance, cpu, process, dll_name, func_name,
-                                    &hook->out_parameter_list, is32Bit);
+                                    &hook->out_parameter_list, cc);
             return true;
         case NtOpenProcess:
             // printf("handling a special API %s for NtOpenProcess\n", func_name);
@@ -505,15 +505,15 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
         case NtWriteVirtualMemory:
             // printf("handling a special API %s for NtWriteVirtualMemory\n", func_name);
             handle_ZwWriteVirtualMemory(gemu_instance, cpu, process, dll_name,
-                                        func_name, &hook->out_parameter_list, is32Bit);
+                                        func_name, &hook->out_parameter_list, cc);
             return true;
         case NtAllocateVirtualMemory:
             // printf("handling a special API %s for NtAllocateVirtualMemory\n", func_name);
             return true;
         case NtWriteFile:
             // printf("handling a special API %s for NtWriteFile\n", func_name);
-            handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name, &hook->out_parameter_list,
-                            is32Bit);
+            handle_ZwWriteFile(gemu_instance, cpu, process, dll_name, func_name,
+                               &hook->out_parameter_list, cc);
             return true;
         case NtMapViewOfSection:
             // printf("handling a special API %s for NtMapViewOfSection\n", func_name);
@@ -523,7 +523,8 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
             return true;
         case NtOpenFile:
             // printf("handling a special API %s for NtOpenFile\n", func_name);
-            handle_NtOpenFile(gemu_instance, cpu, process, dll_name, func_name, &hook->out_parameter_list, is32Bit);
+            handle_NtOpenFile(gemu_instance, cpu, process, dll_name, func_name,
+                              &hook->out_parameter_list, cc);
             return true;
         default:
             return false;
@@ -533,9 +534,8 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
 
 void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
                                      syscall_t syscall, WinProcess *process) {
-    bool is32bit = false;
+    CallingConvention cc = CC_SYSCALL_64;
     Gemu *gemu_instance = gemu_get_instance();
-
 
     QWORD pid, tid;
     get_current_pid_and_tid(cpu, &pid, &tid, process);
@@ -549,22 +549,17 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
     hook_ptr->out_parameter_list.number_of_outparameters = -2;
     hook_ptr->syscall_enum = syscall;
     const char *dll_name = "syscall";
-
     const char* func_name = SYSCALL_NAMES[syscall];
 
-    handle_special_syscall_apis_enum(gemu_instance, cpu, dll_name, syscall, process, hook_ptr, is32bit);
+    handle_special_syscall_apis_enum(gemu_instance, cpu, dll_name, syscall, process, hook_ptr, cc);
 
-    if (is32bit) {
-        DWORD ret_addr;
-        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t * ) & ret_addr, 4);
-    } else {
+    {
         QWORD ret_addr;
         gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t * ) & ret_addr, 8);
+                                 (uint8_t *) &ret_addr, 8);
     }
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
-                                    &hook_ptr->out_parameter_list, process, is32bit);
+                                    &hook_ptr->out_parameter_list, process, cc);
 
     printf("%llu:%llu:$+%s\n", pid, tid, cJSON_PrintUnformatted(output));
     cJSON_DeleteItemFromObjectCaseSensitive(output, "func");
@@ -580,7 +575,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     Gemu *gemu_instance = gemu_get_instance();
     const char *dll_name = hook->dll_name;
     const char *func_name = hook->func_name;
-    bool is32bit = hook->is32bit;
+    CallingConvention cc = hook->cc;
 
     hook_t newHook = {.addr = 0,
             .callbacks = NULL,
@@ -589,10 +584,10 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
             .func_name = "",
             .out_parameter_list.number_of_outparameters = -2,
             .in_parameters = NULL,
-            .is32bit = is32bit};
+            .cc = cc};
 
     if (unlikely(strncmp(func_name, "Zw", 2) == 0)) {
-        handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);
+        handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, cc);
     }
 
     bool succ_cb_before_tb =
@@ -605,19 +600,19 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     g_utf8_strncpy(newHook.dll_name, dll_name, sizeof(newHook.dll_name) - 1);
     g_utf8_strncpy(newHook.func_name, func_name, sizeof(newHook.func_name) - 1);
 
-    if (is32bit) {
+    if (cc_is32bit(cc)) {
         DWORD ret_addr;
         gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t * ) & ret_addr, 4);
+                                 (uint8_t *) &ret_addr, 4);
         newHook.addr = ret_addr;
     } else {
         QWORD ret_addr;
         gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t * ) & ret_addr, 8);
+                                 (uint8_t *) &ret_addr, 8);
         newHook.addr = ret_addr;
     }
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
-                                    &newHook.out_parameter_list, process, is32bit);
+                                    &newHook.out_parameter_list, process, cc);
 
     QWORD pid;
     QWORD tid;
@@ -637,7 +632,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     }
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
-        handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, is32bit);
+        handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, cc);
     }
 
     // Remove func and dll_name from output before storing as in_parameters
@@ -659,10 +654,10 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
 }
 
 
-void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu, bool is32bit) {
+void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu, CallingConvention cc) {
     printf("FOUND getJit result: 0x%lX\n", result);
     target_ulong compile_method;
-    compile_method = dereference_pointer(cpu, result, 2, is32bit);
+    compile_method = dereference_pointer(cpu, result, 2, cc_is32bit(cc));
     printf("FOUND compileMethod at: 0x%lX\n", compile_method);
     int success = hook_address("compileMethod", "clrjit.dll", (target_long)compile_method, pipe_logger_before_tb_exec);
     if (success == 1){
@@ -895,14 +890,16 @@ static gboolean read_dynamic_symbols_txt(const GPtrArray *function_entries, targ
                     .func_name = "",
                     .out_parameter_list.number_of_outparameters = -1,
                     .in_parameters = NULL,
-                    .is32bit = false};
+                    .cc = CC_WIN64};
 
             g_utf8_strncpy(newHook.dll_name, parts[IdxInLineDLLName],
                            sizeof(newHook.dll_name) - 1);
             g_utf8_strncpy(newHook.func_name, parts[IdxInLineFunctionName],
                            sizeof(newHook.func_name) - 1);
 
-            newHook.is32bit = (g_ascii_strtoull(parts[IdxInLineBitness], NULL, 10) == 32);
+
+            g_strstrip(parts[IdxInLineBitness]); // remove trailing whitespace
+            newHook.cc = cc_from_string(parts[IdxInLineBitness]);
 
             bool succ_cb_before_tb;
             succ_cb_before_tb = hk_add_cb_pair(&newHook, CB_BEFORE_TB_EXEC,

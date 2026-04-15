@@ -101,3 +101,28 @@ QWORD get_parameter(CPUState *cpu, int index, CallingConvention cc) {
             return 0;
     }
 }
+
+QWORD get_return_value(CPUState *cpu, CallingConvention cc) {
+    // All currently supported conventions return in EAX/RAX.
+    // This function exists so convention-specific return-register knowledge
+    // stays in one place if future conventions differ.
+    (void)cc;
+    return cpu->env_ptr->regs[R_EAX];
+}
+
+CallingConvention cc_from_string(const char *s) {
+    if (strcmp(s, "32") == 0 || strcmp(s, "stdcall32") == 0) {
+        return CC_STDCALL_32;
+    } else if (strcmp(s, "64") == 0 || strcmp(s, "win64") == 0) {
+        return CC_WIN64;
+    } else if (strcmp(s, "syscall64") == 0) {
+        return CC_SYSCALL_64;
+    } else if (strcmp(s, "fastcall32") == 0) {
+        return CC_FASTCALL_32;
+    } else if (strcmp(s, "thiscall32") == 0) {
+        return CC_THISCALL_32;
+    } else {
+        fprintf(stderr, "calling_conventions: unknown convention string \"%s\", defaulting to win64\n", s);
+        return CC_WIN64;
+    }
+}

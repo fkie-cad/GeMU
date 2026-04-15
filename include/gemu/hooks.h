@@ -9,6 +9,7 @@
 #include "win_spector.h"
 #include "fastcheck.h"
 #include "cJSON.h"
+#include "calling_conventions.h"
 
 // New callbacks can be added here:
 enum callback
@@ -34,7 +35,7 @@ typedef struct
     cJSON *in_parameters;
     char dll_name[256];
     char func_name[256];
-    bool is32bit;
+    CallingConvention cc;
 } hook_t;
 
 typedef void (*hook_callback_func)(target_ulong pc, CPUState *cpu, TranslationBlock *tb, hook_t *hook, WinProcess *process);
