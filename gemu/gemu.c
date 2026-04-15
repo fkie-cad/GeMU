@@ -553,11 +553,6 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
 
     handle_special_syscall_apis_enum(gemu_instance, cpu, dll_name, syscall, process, hook_ptr, cc);
 
-    {
-        QWORD ret_addr;
-        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t *) &ret_addr, 8);
-    }
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
                                     &hook_ptr->out_parameter_list, process, cc);
 
@@ -988,20 +983,6 @@ gboolean hook_address(const char* func_name, const char *dll_name, target_long a
 
 
 // Function to insert a module into the sorted list
-void insert_sorted(Module** head, Module* new_module) {
-    if (*head == NULL || (*head)->base > new_module->base) {
-        new_module->next = *head;
-        *head = new_module;
-    } else {
-        Module* current = *head;
-        while (current->next != NULL && current->next->base < new_module->base) {
-            current = current->next;
-        }
-        new_module->next = current->next;
-        current->next = new_module;
-    }
-}
-
 
 #define check_type_size(_type, _expected) \
     if (sizeof(_type) != _expected) { \

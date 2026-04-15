@@ -108,7 +108,6 @@ void print_module_nodes(ModuleNode *head);
 
 Module *create_module(unsigned int base, unsigned int size, const char *path);
 
-void insert_sorted(Module **head, Module *new_module);
 
 Module *parse_modules(const char *filename);
 
