@@ -59,7 +59,7 @@ DWORD dereference_pointer32(CPUState *cpu, DWORD value, int times) {
     }
     DWORD new_value;
     for (int i = 0; i < times; i++) {
-        gemu_virtual_memory_rw(cpu, result, (uint8_t * ) & new_value, 4, false);
+        gemu_virtual_memory_read(cpu, result, (uint8_t * ) & new_value, 4);
         result = new_value;
     }
     return result;
@@ -72,7 +72,7 @@ QWORD dereference_pointer64(CPUState *cpu, QWORD value, int times) {
     }
     QWORD new_value;
     for (int i = 0; i < times; i++) {
-        gemu_virtual_memory_rw(cpu, result, (uint8_t * ) & new_value, 8, false);
+        gemu_virtual_memory_read(cpu, result, (uint8_t * ) & new_value, 8);
         result = new_value;
     }
     return result;
@@ -91,8 +91,8 @@ bool is_parameter_type_in(char *type, const char *types[]) {
 
 DWORD get_parameter32(CPUState *cpu, int index) {
     DWORD result;
-    gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP] + (4 + index * 4),
-                            (uint8_t * ) & result, 4, false);
+    gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP] + (4 + index * 4),
+                             (uint8_t * ) & result, 4);
     return result;
 }
 
@@ -112,8 +112,8 @@ QWORD get_parameter64(CPUState *cpu, int index) {
             result = cpu->env_ptr->regs[9];
             break;
         default:
-            gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP] + (8 + index * 8),
-                                    (uint8_t * ) & result, 8, false);
+            gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP] + (8 + index * 8),
+                                     (uint8_t * ) & result, 8);
             break;
     }
     return result;
@@ -128,8 +128,8 @@ int count_dereferences(char *s) {
 void fill_processinformation32(CPUState *cpu, QWORD value,
                                cJSON *processinformation, WinProcess *process) {
     PROCESS_INFORMATION32 process_info;
-    gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
-                            sizeof process_info, false);
+    gemu_virtual_memory_read(cpu, value, (uint8_t * ) & process_info,
+                             sizeof process_info);
     printf("NEW PID: %i\n", process_info.dwProcessId);
     printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n",
            process->ID, process_info.dwProcessId);
@@ -150,8 +150,8 @@ void fill_processinformation32(CPUState *cpu, QWORD value,
 void fill_processinformation64(CPUState *cpu, QWORD value,
                                cJSON *processinformation, WinProcess *process) {
     PROCESS_INFORMATION64 process_info;
-    gemu_virtual_memory_rw(cpu, value, (uint8_t * ) & process_info,
-                            sizeof process_info, false);
+    gemu_virtual_memory_read(cpu, value, (uint8_t * ) & process_info,
+                             sizeof process_info);
     printf("NEW PID: %i\n", process_info.dwProcessId);
     printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n",
            process->ID, process_info.dwProcessId);
@@ -458,13 +458,13 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
     target_ulong size_of_list;
     target_ulong ptr_current_attribute;
     PS_ATTRIBUTE current_attribute;
-    gemu_virtual_memory_rw(cpu, pAttributeList, (uint8_t*) &size_of_list, sizeof(size_of_list), false);
+    gemu_virtual_memory_read(cpu, pAttributeList, (uint8_t*) &size_of_list, sizeof(size_of_list));
     ptr_current_attribute = pAttributeList + (sizeof(PS_ATTRIBUTE_LIST) - sizeof(PS_ATTRIBUTE));
     CLIENT_ID64 client_id = {.ProcessId = 0, .ThreadId = 0};
     for (; ptr_current_attribute + sizeof(PS_ATTRIBUTE) <= pAttributeList + size_of_list; ptr_current_attribute += sizeof(PS_ATTRIBUTE)){
-        gemu_virtual_memory_rw(cpu, ptr_current_attribute, (uint8_t*) &current_attribute, sizeof(current_attribute), false);
+        gemu_virtual_memory_read(cpu, ptr_current_attribute, (uint8_t*) &current_attribute, sizeof(current_attribute));
         if (current_attribute.Attribute == PS_ATTRIBUTE_CLIENT_ID){
-            gemu_virtual_memory_rw(cpu, current_attribute.ValuePtr, (uint8_t*) &client_id, current_attribute.Size, false);
+            gemu_virtual_memory_read(cpu, current_attribute.ValuePtr, (uint8_t*) &client_id, current_attribute.Size);
             break;
         }
     }
@@ -648,7 +648,7 @@ void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process, 
     }
     uint8_t *buf = malloc(size + 1);
     extracted_data_size_files += size;
-    gemu_virtual_memory_rw(cpu, start, buf, size, false);
+    gemu_virtual_memory_read(cpu, start, buf, size);
     char filename[261];
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
@@ -702,7 +702,7 @@ void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
         return;
     }
     uint8_t *buf = malloc(size + 1);
-    gemu_virtual_memory_rw(cpu, start, buf, size, false);
+    gemu_virtual_memory_read(cpu, start, buf, size);
     extracted_data_size_files += size;
     char filename[261];
     struct timespec now;
@@ -738,8 +738,8 @@ static void handle_NtOpenFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *pr
 
     cJSON_Delete(output);
 
-    gemu_virtual_memory_rw(cpu, attributes_addr, (uint8_t*) &attributes, sizeof(attributes), false);
-    gemu_virtual_memory_rw(cpu, attributes.ObjectName, (uint8_t*) &object_name, sizeof(object_name), false);
+    gemu_virtual_memory_read(cpu, attributes_addr, (uint8_t*) &attributes, sizeof(attributes));
+    gemu_virtual_memory_read(cpu, attributes.ObjectName, (uint8_t*) &object_name, sizeof(object_name));
 
     if(sizeof(attributes) != attributes.Length){
         printf("missmatch in OBJECT_ATTRIBUTES size\n!");
@@ -867,14 +867,14 @@ void pipe_logger_before_syscall_exec_enum(CPUState *cpu,
     cJSON *output;
     if (is32bit) {
         DWORD ret_addr;
-        gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP],
-                                (uint8_t * ) & ret_addr, 4, false);
+        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
+                                 (uint8_t * ) & ret_addr, 4);
         output =
                 read_parameters32(gemu_instance, cpu, func_name, dll_name, &hook_ptr->out_parameter_list, process);
     } else {
         QWORD ret_addr;
-        gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP],
-                                (uint8_t * ) & ret_addr, 8, false);
+        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
+                                 (uint8_t * ) & ret_addr, 8);
         output =
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &hook_ptr->out_parameter_list, process);
     }
@@ -921,15 +921,15 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     cJSON *output;
     if (is32bit) {
         DWORD ret_addr;
-        gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP],
-                                (uint8_t * ) & ret_addr, 4, false);
+        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
+                                 (uint8_t * ) & ret_addr, 4);
         newHook.addr = ret_addr;
         output =
                 read_parameters32(gemu_instance, cpu, func_name, dll_name, &newHook.out_parameter_list, process);
     } else {
         QWORD ret_addr;
-        gemu_virtual_memory_rw(cpu, cpu->env_ptr->regs[R_ESP],
-                                (uint8_t * ) & ret_addr, 8, false);
+        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
+                                 (uint8_t * ) & ret_addr, 8);
         newHook.addr = ret_addr;
         output =
                 read_parameters64(gemu_instance, cpu, func_name, dll_name, &newHook.out_parameter_list, process);
@@ -1049,17 +1049,17 @@ void wi_extract_module_list(CPUState *cpu, WinProcess *process) {
     TEB64 teb;
     PEB64 peb;
     SegmentCache gs = env->segs[R_GS];
-    gemu_virtual_memory_rw(cpu, gs.base, (uint8_t *) &teb, sizeof teb, false);
-    gemu_virtual_memory_rw(cpu, teb.ProcessEnvironmentBlock, (uint8_t *) &peb, sizeof peb, false);
+    gemu_virtual_memory_read(cpu, gs.base, (uint8_t *) &teb, sizeof teb);
+    gemu_virtual_memory_read(cpu, teb.ProcessEnvironmentBlock, (uint8_t *) &peb, sizeof peb);
     PEB_LDR_DATA64 ldr_data;
     LDR_DATA_TABLE_ENTRY64 currentModule;
-    gemu_virtual_memory_rw(cpu, peb.Ldr, (uint8_t *) &ldr_data, sizeof ldr_data, false);
+    gemu_virtual_memory_read(cpu, peb.Ldr, (uint8_t *) &ldr_data, sizeof ldr_data);
     LIST_ENTRY* next_module = ldr_data.InMemoryOrderModuleList.Flink;
     // start extracting 64bit modules
     do {
         //substract sizeof(LIST_ENTRY), because we use MemoryOrder instead of LoadOrder
         //Using MemoryOrder, because it seems to contain no loops.
-        gemu_virtual_memory_rw(cpu, (target_ulong) next_module-sizeof(LIST_ENTRY), (uint8_t *) &currentModule, sizeof currentModule, false);
+        gemu_virtual_memory_read(cpu, (target_ulong) next_module-sizeof(LIST_ENTRY), (uint8_t *) &currentModule, sizeof currentModule);
         char *current_module_name = malloc(currentModule.FullDllName.u.Length + 1);
         guest_wstrncpy(cpu, current_module_name, currentModule.FullDllName.u.Length + 1, currentModule.FullDllName.Buffer);
 
@@ -1090,18 +1090,18 @@ void wi_extract_module_list(CPUState *cpu, WinProcess *process) {
         TEB32 teb32;
         PEB32 peb32;
         SegmentCache fs = env->segs[R_FS];
-        gemu_virtual_memory_rw(cpu, fs.base, (uint8_t *) &teb32, sizeof teb32, false);
-        gemu_virtual_memory_rw(cpu, teb32.ProcessEnvironmentBlock, (uint8_t *) &peb32, sizeof peb32, false);
+        gemu_virtual_memory_read(cpu, fs.base, (uint8_t *) &teb32, sizeof teb32);
+        gemu_virtual_memory_read(cpu, teb32.ProcessEnvironmentBlock, (uint8_t *) &peb32, sizeof peb32);
         if (peb32.Ldr == 0) {
             process->current_modules = head;
             return;
         }
         PEB_LDR_DATA32 ldr_data;
         LDR_DATA_TABLE_ENTRY32 currentModule;
-        gemu_virtual_memory_rw(cpu, peb32.Ldr, (uint8_t *) &ldr_data, sizeof ldr_data, false);
+        gemu_virtual_memory_read(cpu, peb32.Ldr, (uint8_t *) &ldr_data, sizeof ldr_data);
         DWORD next_module = ldr_data.InMemoryOrderModuleListFlink;
         do {
-            gemu_virtual_memory_rw(cpu, next_module, (uint8_t *) &currentModule, sizeof currentModule, false);
+            gemu_virtual_memory_read(cpu, next_module, (uint8_t *) &currentModule, sizeof currentModule);
             if (currentModule.DllBase != 0) {
                 char *current_module_name = malloc(currentModule.FullDllName.Length + 1);
                 guest_wstrncpy(cpu, current_module_name, currentModule.FullDllName.Length + 1, currentModule.FullDllName.Buffer);

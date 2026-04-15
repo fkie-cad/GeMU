@@ -199,7 +199,7 @@ void get_current_pid_and_tid(CPUState *cpu, QWORD *processid, QWORD *threadid, W
       process->gsbase = env->segs[R_GS].base;
   }
   //gemu_virtual_memory_rw(cpu, gs.base, (uint8_t *)&teb, sizeof teb, false);
-  gemu_virtual_memory_rw(cpu, process->gsbase, (uint8_t *)&teb, sizeof teb, false);
+  gemu_virtual_memory_read(cpu, process->gsbase, (uint8_t *)&teb, sizeof teb);
   *processid = teb.ClientId.ProcessId;
   *threadid = teb.ClientId.ThreadId;
 }
@@ -226,14 +226,14 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
   CPUX86State *env = cpu->env_ptr;
   SegmentCache gs = env->segs[R_GS];
   // Read TEB
-  gemu_virtual_memory_rw(cpu, gs.base, (uint8_t *)&teb, sizeof teb, false);
+  gemu_virtual_memory_read(cpu, gs.base, (uint8_t *)&teb, sizeof teb);
   // Read PEB
-  gemu_virtual_memory_rw(cpu, teb.ProcessEnvironmentBlock, (uint8_t *)&peb,
-                         sizeof peb, false);
+  gemu_virtual_memory_read(cpu, teb.ProcessEnvironmentBlock, (uint8_t *)&peb,
+                           sizeof peb);
   // Read ProcessParameters of PEB
-  gemu_virtual_memory_rw(cpu, peb.ProcessParameters,
-                         (uint8_t *)&processParameters,
-                         sizeof processParameters, false);
+  gemu_virtual_memory_read(cpu, peb.ProcessParameters,
+                           (uint8_t *)&processParameters,
+                           sizeof processParameters);
 
   // Read ImagePathName
   char *imagePathName = malloc(processParameters.ImagePathName.u.Length + 1);
