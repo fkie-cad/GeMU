@@ -90,10 +90,6 @@ void fill_processinformation(CPUState *cpu, QWORD value, cJSON *processinformati
 
 bool is_parameter_type_in(char *type, const char *types[]);
 
-QWORD dereference_pointer64(CPUState *cpu, QWORD value, int times);
-
-DWORD dereference_pointer32(CPUState *cpu, DWORD value, int times);
-
 QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit);
 
 int count_dereferences(char *s);

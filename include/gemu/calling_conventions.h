@@ -14,10 +14,6 @@ typedef enum {
     CC_THISCALL_32,  // 32-bit __thiscall: this in ecx, rest on stack
 } CallingConvention;
 
-DWORD get_parameter32(CPUState *cpu, int index);
-
-QWORD get_parameter64(CPUState *cpu, int index);
-
 QWORD get_parameter(CPUState *cpu, int index, CallingConvention cc);
 
 #endif // GEMU_CALLING_CONVENTIONS_H

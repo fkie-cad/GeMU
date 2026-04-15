@@ -53,38 +53,17 @@ const char *DO_NOT_DEREFRENCE[] = {"lpBaseAddress", "lpAddress", "*BaseAddress",
                              "corinfo_method_info",
                              NULL};
 
-DWORD dereference_pointer32(CPUState *cpu, DWORD value, int times) {
-    DWORD result = value;
-    if (value == 0) {
-        return 0;
-    }
-    DWORD new_value;
-    for (int i = 0; i < times; i++) {
-        gemu_virtual_memory_read(cpu, result, (uint8_t * ) & new_value, 4);
-        result = new_value;
-    }
-    return result;
-}
-
-QWORD dereference_pointer64(CPUState *cpu, QWORD value, int times) {
-    QWORD result = value;
-    if (value == 0) {
-        return 0;
-    }
-    QWORD new_value;
-    for (int i = 0; i < times; i++) {
-        gemu_virtual_memory_read(cpu, result, (uint8_t * ) & new_value, 8);
-        result = new_value;
-    }
-    return result;
-}
-
 QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit) {
-    if (is32bit) {
-        return (QWORD)dereference_pointer32(cpu, (DWORD)value, times);
-    } else {
-        return dereference_pointer64(cpu, value, times);
+    if (value == 0) {
+        return 0;
     }
+    int size = is32bit ? 4 : 8;
+    for (int i = 0; i < times; i++) {
+        QWORD new_value = 0;
+        gemu_virtual_memory_read(cpu, value, (uint8_t *) &new_value, size);
+        value = new_value;
+    }
+    return value;
 }
 
 bool is_parameter_type_in(char *type, const char *types[]) {
@@ -104,56 +83,35 @@ int count_dereferences(char *s) {
     return i;
 }
 
-static void fill_processinformation32(CPUState *cpu, QWORD value,
-                               cJSON *processinformation, WinProcess *process) {
-    PROCESS_INFORMATION32 process_info;
-    gemu_virtual_memory_read(cpu, value, (uint8_t * ) & process_info,
-                             sizeof process_info);
-    printf("NEW PID: %i\n", process_info.dwProcessId);
-    printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n",
-           process->ID, process_info.dwProcessId);
-
-    g_hash_table_insert(gemu_instance->pids_to_lookout_for,
-                        GINT_TO_POINTER(process_info.dwProcessId), NULL);
-    cJSON_AddNumberToObject(processinformation, "ProcessId",
-                            process_info.dwProcessId);
-    cJSON_AddNumberToObject(processinformation, "ThreadId",
-                            process_info.dwThreadId);
-    cJSON_AddNumberToObject(processinformation, "hProcess",
-                            process_info.hProcess);
-    cJSON_AddNumberToObject(processinformation, "hThread", process_info.hThread);
-    g_hash_table_insert(process->process_handles, GINT_TO_POINTER((int)process_info.hProcess), GINT_TO_POINTER((int)process_info.dwProcessId));
-    // printf("adding %u, %u to process handles\n", process_info.hProcess, process_info.dwProcessId);
-}
-
-static void fill_processinformation64(CPUState *cpu, QWORD value,
-                               cJSON *processinformation, WinProcess *process) {
-    PROCESS_INFORMATION64 process_info;
-    gemu_virtual_memory_read(cpu, value, (uint8_t * ) & process_info,
-                             sizeof process_info);
-    printf("NEW PID: %i\n", process_info.dwProcessId);
-    printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n",
-           process->ID, process_info.dwProcessId);
-    g_hash_table_insert(gemu_instance->pids_to_lookout_for,
-                        GINT_TO_POINTER(process_info.dwProcessId), NULL);
-    cJSON_AddNumberToObject(processinformation, "ProcessId",
-                            process_info.dwProcessId);
-    cJSON_AddNumberToObject(processinformation, "ThreadId",
-                            process_info.dwThreadId);
-    cJSON_AddNumberToObject(processinformation, "hProcess",
-                            process_info.hProcess);
-    cJSON_AddNumberToObject(processinformation, "hThread", process_info.hThread);
-    g_hash_table_insert(process->process_handles, GINT_TO_POINTER(process_info.hProcess), GINT_TO_POINTER(process_info.dwProcessId));
-    // printf("adding %llu, %u to process handles\n", process_info.hProcess, process_info.dwProcessId);
-}
-
 void fill_processinformation(CPUState *cpu, QWORD value, cJSON *processinformation,
                              WinProcess *process, bool is32bit) {
+    DWORD dwProcessId, dwThreadId;
+    QWORD hProcess, hThread;
+
     if (is32bit) {
-        fill_processinformation32(cpu, value, processinformation, process);
+        PROCESS_INFORMATION32 process_info;
+        gemu_virtual_memory_read(cpu, value, (uint8_t *) &process_info, sizeof process_info);
+        dwProcessId = process_info.dwProcessId;
+        dwThreadId  = process_info.dwThreadId;
+        hProcess    = process_info.hProcess;
+        hThread     = process_info.hThread;
     } else {
-        fill_processinformation64(cpu, value, processinformation, process);
+        PROCESS_INFORMATION64 process_info;
+        gemu_virtual_memory_read(cpu, value, (uint8_t *) &process_info, sizeof process_info);
+        dwProcessId = process_info.dwProcessId;
+        dwThreadId  = process_info.dwThreadId;
+        hProcess    = process_info.hProcess;
+        hThread     = process_info.hThread;
     }
+
+    printf("NEW PID: %i\n", dwProcessId);
+    printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n", process->ID, dwProcessId);
+    g_hash_table_insert(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(dwProcessId), NULL);
+    cJSON_AddNumberToObject(processinformation, "ProcessId", dwProcessId);
+    cJSON_AddNumberToObject(processinformation, "ThreadId", dwThreadId);
+    cJSON_AddNumberToObject(processinformation, "hProcess", hProcess);
+    cJSON_AddNumberToObject(processinformation, "hThread", hThread);
+    g_hash_table_insert(process->process_handles, GINT_TO_POINTER(hProcess), GINT_TO_POINTER(dwProcessId));
 }
 
 cJSON *read_parameters(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
@@ -816,11 +774,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
 void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu, bool is32bit) {
     printf("FOUND getJit result: 0x%lX\n", result);
     target_ulong compile_method;
-    if (is32bit){
-        compile_method = dereference_pointer32(cpu, result, 2);
-    } else {
-        compile_method = dereference_pointer64(cpu, result, 2);
-    }
+    compile_method = dereference_pointer(cpu, result, 2, is32bit);
     printf("FOUND compileMethod at: 0x%lX\n", compile_method);
     int success = hook_address("compileMethod", "clrjit.dll", (target_long)compile_method, pipe_logger_before_tb_exec);
     if (success == 1){

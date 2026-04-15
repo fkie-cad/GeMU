@@ -85,14 +85,6 @@ static DWORD get_parameter_fastcall32(CPUState *cpu, int index) {
     return result;
 }
 
-DWORD get_parameter32(CPUState *cpu, int index) {
-    return get_parameter_stdcall32(cpu, index);
-}
-
-QWORD get_parameter64(CPUState *cpu, int index) {
-    return get_parameter_win64(cpu, index);
-}
-
 QWORD get_parameter(CPUState *cpu, int index, CallingConvention cc) {
     switch (cc) {
         case CC_STDCALL_32:
