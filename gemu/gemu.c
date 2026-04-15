@@ -1,6 +1,7 @@
 #define USE_SYSCALL_NAMES
 #include "gemu/gemu.h"
 #include "gemu/calling_conventions.h"
+#include "gemu/parameter_types.h"
 #include "gemu/cJSON.h"
 #include "gemu/fastcheck.h"
 #include "gemu/memorymapper.h"
@@ -43,15 +44,6 @@ char dotnet_mode_str[256];
 char syscalltable[256];
 // struct timespec* start_time = NULL;
 
-const char *PSTR[] = {"Windows.Win32.Foundation.PSTR", "LPCWSTR", NULL};
-const char *PWSTR[] = {"Windows.Win32.Foundation.PWSTR", "LPCSTR", NULL};
-const char *PROCESS_INFORMATION_PARAS[] = {
-        "Windows.Win32.System.Threading.PROCESS_INFORMATION*",
-        "LPPROCESS_INFORMATION", NULL};
-const char *DO_NOT_DEREFRENCE[] = {"lpBaseAddress", "lpAddress", "*BaseAddress",
-                             "PVOID", "ULONG",
-                             "corinfo_method_info",
-                             NULL};
 
 QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit) {
     if (value == 0) {
@@ -66,53 +58,7 @@ QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit) {
     return value;
 }
 
-bool is_parameter_type_in(char *type, const char *types[]) {
-    int i = 0;
-    while (types[i]) {
-        if (unlikely(strcmp(types[i], type) == 0)) {
-            return true;
-        }
-        i++;
-    }
-    return false;
-}
 
-int count_dereferences(char *s) {
-    int i;
-    for (i = 0; s[i]; s[i] == '*' ? i++ : *s++);
-    return i;
-}
-
-void fill_processinformation(CPUState *cpu, QWORD value, cJSON *processinformation,
-                             WinProcess *process, bool is32bit) {
-    DWORD dwProcessId, dwThreadId;
-    QWORD hProcess, hThread;
-
-    if (is32bit) {
-        PROCESS_INFORMATION32 process_info;
-        gemu_virtual_memory_read(cpu, value, (uint8_t *) &process_info, sizeof process_info);
-        dwProcessId = process_info.dwProcessId;
-        dwThreadId  = process_info.dwThreadId;
-        hProcess    = process_info.hProcess;
-        hThread     = process_info.hThread;
-    } else {
-        PROCESS_INFORMATION64 process_info;
-        gemu_virtual_memory_read(cpu, value, (uint8_t *) &process_info, sizeof process_info);
-        dwProcessId = process_info.dwProcessId;
-        dwThreadId  = process_info.dwThreadId;
-        hProcess    = process_info.hProcess;
-        hThread     = process_info.hThread;
-    }
-
-    printf("NEW PID: %i\n", dwProcessId);
-    printf("PROCESS_CREATED parent=%llu child=%i image=unknown\n", process->ID, dwProcessId);
-    g_hash_table_insert(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(dwProcessId), NULL);
-    cJSON_AddNumberToObject(processinformation, "ProcessId", dwProcessId);
-    cJSON_AddNumberToObject(processinformation, "ThreadId", dwThreadId);
-    cJSON_AddNumberToObject(processinformation, "hProcess", hProcess);
-    cJSON_AddNumberToObject(processinformation, "hThread", hThread);
-    g_hash_table_insert(process->process_handles, GINT_TO_POINTER(hProcess), GINT_TO_POINTER(dwProcessId));
-}
 
 cJSON *read_parameters(Gemu *gemu_instance, CPUState *cpu, const char *func_name,
                        const char *dll_name, out_parameter_list_t *out_parameter_list,
@@ -130,38 +76,8 @@ cJSON *read_parameters(Gemu *gemu_instance, CPUState *cpu, const char *func_name
     for (int i = 0; i < function_entry->num_parameters; i++) {
         FunctionParameter *parameter = &function_entry->parameters[i];
         QWORD value = get_parameter(cpu, i, is32bit ? CC_STDCALL_32 : CC_WIN64);
-        while (is_in_parameter(parameter)) {
-            if (is_parameter_type_in(parameter->type, PSTR)) {
-                char *s = malloc(256);
-                guest_astrncpy(cpu, s, 256, value);
-                cJSON_AddStringToObject(output, parameter->name, s);
-                free(s);
-                break;
-            }
-            if (is_parameter_type_in(parameter->type, PWSTR)) {
-                char *s = malloc(512);
-                guest_wstrncpy(cpu, s, 512, value);
-                cJSON_AddStringToObject(output, parameter->name, s);
-                free(s);
-                break;
-            }
-            if (is_parameter_type_in(parameter->type, PROCESS_INFORMATION_PARAS)) {
-                cJSON *process_information = cJSON_AddObjectToObject(output, parameter->name);
-                fill_processinformation(cpu, value, process_information, process, is32bit);
-                break;
-            }
-            if (is_parameter_type_in(parameter->name, DO_NOT_DEREFRENCE)) {
-                cJSON_AddNumberToObject(output, parameter->name, value);
-                break;
-            }
-            if (strstr(parameter->type, "*")) {
-                int dereferences = count_dereferences(parameter->type);
-                QWORD deref_value = dereference_pointer(cpu, value, dereferences, is32bit);
-                cJSON_AddNumberToObject(output, parameter->name, deref_value);
-                break;
-            }
-            cJSON_AddNumberToObject(output, parameter->name, value);
-            break;
+        if (is_in_parameter(parameter)) {
+            dispatch_type_handler(cpu, parameter, value, output, process, is32bit);
         }
         if (is_out_parameter(parameter)) {
             out_parameter_list->out_parameters[outparameter].address = value;
@@ -189,36 +105,8 @@ cJSON *read_out_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
     }
     for (int i = 0; i < number_of_outparameters; i++) {
         FunctionParameter *parameter = &function_entry->parameters[out_parameters[i].parameter_number];
-        if (is_parameter_type_in(parameter->type, PSTR)) {
-            char *s = malloc(256);
-            guest_astrncpy(cpu, s, 256, out_parameters[i].address);
-            cJSON_AddStringToObject(output, parameter->name, s);
-            free(s);
-            continue;
-        }
-        if (is_parameter_type_in(parameter->type, PWSTR)) {
-            char *s = malloc(512);
-            guest_wstrncpy(cpu, s, 512, out_parameters[i].address);
-            cJSON_AddStringToObject(output, parameter->name, s);
-            free(s);
-            continue;
-        }
-        if (is_parameter_type_in(parameter->type, PROCESS_INFORMATION_PARAS)) {
-            cJSON *process_information = cJSON_AddObjectToObject(output, parameter->name);
-            fill_processinformation(cpu, out_parameters[i].address, process_information, process, is32bit);
-            continue;
-        }
-        if (strcmp(parameter->type, "*CLIENT_ID") == 0) {
-            cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
-            continue;
-        }
-        if (is_parameter_type_in(parameter->name, DO_NOT_DEREFRENCE)) {
-            cJSON_AddNumberToObject(output, parameter->name, out_parameters[i].address);
-            continue;
-        }
-        int dereferences = count_dereferences(parameter->type);
-        QWORD value = dereference_pointer(cpu, out_parameters[i].address, dereferences, is32bit);
-        cJSON_AddNumberToObject(output, parameter->name, value);
+        QWORD addr = out_parameters[i].address;
+        dispatch_type_handler(cpu, parameter, addr, output, process, is32bit);
     }
     return output;
 }
@@ -1237,6 +1125,7 @@ void gemu_init(void) {
         exit(EXIT_FAILURE);
     }
     *gemu_instance = instance;
+    init_type_handlers();
     printf("Done initializing Gemu\n");
 }
 

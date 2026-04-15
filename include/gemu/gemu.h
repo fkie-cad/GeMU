@@ -85,14 +85,10 @@ cJSON *read_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
                        const char *dll_name, out_parameter_list_t *out_parameter_list,
                        WinProcess *process, bool is32bit);
 
-void fill_processinformation(CPUState *cpu, QWORD value, cJSON *processinformation,
-                             WinProcess *process, bool is32bit);
 
-bool is_parameter_type_in(char *type, const char *types[]);
 
 QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit);
 
-int count_dereferences(char *s);
 
 void wi_extract_module_list(CPUState *cpu, WinProcess *process);
 

@@ -2,6 +2,7 @@ gemu_ss = ss.source_set()
 
 gemu_ss.add(files(
   './calling_conventions.c',
+  './parameter_types.c',
   './cJSON.c',
   './fastcheck.c',
   './callbacks.c',
