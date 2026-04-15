@@ -627,6 +627,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     }
 
     if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
+        // TODO: this does nothing, as LoadLibrary is not included here. either remove or use handle_loaded_library?
         handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, cc);
     }
 
