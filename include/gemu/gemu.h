@@ -106,6 +106,8 @@ QWORD dereference_pointer64(CPUState *cpu, QWORD value, int times);
 
 DWORD dereference_pointer32(CPUState *cpu, DWORD value, int times);
 
+QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit);
+
 int count_dereferences(char *s);
 
 void wi_extract_module_list(CPUState *cpu, WinProcess *process);

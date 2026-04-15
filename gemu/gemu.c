@@ -78,6 +78,14 @@ QWORD dereference_pointer64(CPUState *cpu, QWORD value, int times) {
     return result;
 }
 
+QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit) {
+    if (is32bit) {
+        return (QWORD)dereference_pointer32(cpu, (DWORD)value, times);
+    } else {
+        return dereference_pointer64(cpu, value, times);
+    }
+}
+
 bool is_parameter_type_in(char *type, const char *types[]) {
     int i = 0;
     while (types[i]) {
