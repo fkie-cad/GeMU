@@ -598,17 +598,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
     g_utf8_strncpy(newHook.dll_name, dll_name, sizeof(newHook.dll_name) - 1);
     g_utf8_strncpy(newHook.func_name, func_name, sizeof(newHook.func_name) - 1);
 
-    if (cc_is32bit(cc)) {
-        DWORD ret_addr;
-        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t *) &ret_addr, 4);
-        newHook.addr = ret_addr;
-    } else {
-        QWORD ret_addr;
-        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
-                                 (uint8_t *) &ret_addr, 8);
-        newHook.addr = ret_addr;
-    }
+    newHook.addr = get_return_address(cpu, cc);
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
                                     &newHook.out_parameter_list, process, cc);
 

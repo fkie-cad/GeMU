@@ -19,6 +19,9 @@ QWORD get_parameter(CPUState *cpu, int index, CallingConvention cc);
 // Returns the return value register for the given calling convention.
 QWORD get_return_value(CPUState *cpu, CallingConvention cc);
 
+// Reads the return address from the top of the stack.
+QWORD get_return_address(CPUState *cpu, CallingConvention cc);
+
 // Parses a convention string from the symbol mapping file.
 // "32" and "stdcall32" → CC_STDCALL_32
 // "64" and "win64"     → CC_WIN64

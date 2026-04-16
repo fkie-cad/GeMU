@@ -110,6 +110,20 @@ QWORD get_return_value(CPUState *cpu, CallingConvention cc) {
     return cpu->env_ptr->regs[R_EAX];
 }
 
+QWORD get_return_address(CPUState *cpu, CallingConvention cc) {
+    if (cc_is32bit(cc)) {
+        DWORD ret_addr;
+        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
+                                 (uint8_t *) &ret_addr, 4);
+        return (QWORD)ret_addr;
+    } else {
+        QWORD ret_addr;
+        gemu_virtual_memory_read(cpu, cpu->env_ptr->regs[R_ESP],
+                                 (uint8_t *) &ret_addr, 8);
+        return ret_addr;
+    }
+}
+
 CallingConvention cc_from_string(const char *s) {
     if (strcmp(s, "32") == 0 || strcmp(s, "stdcall32") == 0) {
         return CC_STDCALL_32;
