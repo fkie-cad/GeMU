@@ -46,6 +46,9 @@ char syscalltable[256];
 
 
 QWORD dereference_pointer(CPUState *cpu, QWORD value, int times, bool is32bit) {
+    if (is32bit){
+        value = value & (DWORD)(-1);
+    }
     if (value == 0) {
         return 0;
     }
