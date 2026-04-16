@@ -970,9 +970,6 @@ gboolean hook_address(const char* func_name, const char *dll_name, target_long a
 }
 
 
-
-// Function to insert a module into the sorted list
-
 #define check_type_size(_type, _expected) \
     if (sizeof(_type) != _expected) { \
         printf("ERROR: type " #_type " has wrong size! Expected 0x%lX, got %lX\n", (size_t)_expected, sizeof(_type)); \
