@@ -619,11 +619,6 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
         printf("PROCESS_CREATING parent=%llu command=%s\n", pid, command);
     }
 
-    if (unlikely(strncmp(func_name, "LoadLibrary", 11) == 0)) {
-        // TODO: this does nothing, as LoadLibrary is not included here. either remove or use handle_loaded_library?
-        handle_special_apis(gemu_instance, cpu, dll_name, func_name, process, &newHook.out_parameter_list, cc);
-    }
-
     // Remove func and dll_name from output before storing as in_parameters
     // (these are already in the hook struct and will be re-added at exit)
     cJSON_DeleteItemFromObjectCaseSensitive(output, "func");
