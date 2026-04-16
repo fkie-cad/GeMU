@@ -2,6 +2,7 @@
 #define GEMU_DOTNET_SPECTOR_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "qemu/typedefs.h"
 #include "gemu/peb_teb.h"
 
@@ -203,6 +204,6 @@ typedef struct {
 
 //////////////////
 
-void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulong native_address, void* native_code_hook_function);
+void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulong native_address, void* native_code_hook_function, bool is32bit);
 
 #endif //GEMU_DOTNET_SPECTOR_H

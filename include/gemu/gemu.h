@@ -121,7 +121,8 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 
 void gemu_start_recording(void);
 
-gboolean hook_address(const char* func_name, const char *dll_name, target_long address, void* function);
+gboolean hook_address(const char *func_name, const char *dll_name,
+                      target_long address, void *function, CallingConvention cc);
 
 void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu, CallingConvention cc);
 

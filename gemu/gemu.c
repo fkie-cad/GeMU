@@ -311,7 +311,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         }
         if (strcmp(func_name, "compileMethod") == 0) {
             int native_address = cJSON_GetObjectItemCaseSensitive(output, "nativeEntry")->valueint;
-            handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, native_address, pipe_logger_before_tb_exec);
+            handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, native_address, pipe_logger_before_tb_exec, cc_is32bit(hook->cc));
         }
     }
 
@@ -631,7 +631,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
 
     if (gemu_instance->tracking_mode & TRACKING_BASICBLOCK_DOTNET){
         if (unlikely(strncmp(func_name, "compileMethod", 13) == 0)) {
-            handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, 0, pipe_logger_before_tb_exec);
+            handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, 0, pipe_logger_before_tb_exec, cc_is32bit(hook->cc));
         }
     }
     // output is now owned by the hook's in_parameters — freed at exit
@@ -643,7 +643,9 @@ void handle_getJit_exit(Gemu *gemu_instance, target_ulong result, CPUState *cpu,
     target_ulong compile_method;
     compile_method = dereference_pointer(cpu, result, 2, cc_is32bit(cc));
     printf("FOUND compileMethod at: 0x%lX\n", compile_method);
-    int success = hook_address("compileMethod", "clrjit.dll", (target_long)compile_method, pipe_logger_before_tb_exec);
+    int success = hook_address("compileMethod", "clrjit.dll", (target_long)compile_method,
+                               pipe_logger_before_tb_exec,
+                               cc_is32bit(cc) ? CC_THISCALL_32 : CC_WIN64);
     if (success == 1){
         printf("hooking might have worked\n");
     } else {
@@ -867,43 +869,10 @@ static gboolean read_dynamic_symbols_txt(const GPtrArray *function_entries, targ
                 printf("Invalid line in symbols.txt: %s\n", parts[0]);
                 return 0;
             }
-            hook_t newHook = {.addr = 0,
-                    .callbacks = NULL,
-                    .callback_count = 0,
-                    .dll_name = "",
-                    .func_name = "",
-                    .out_parameter_list.number_of_outparameters = -1,
-                    .in_parameters = NULL,
-                    .cc = CC_WIN64};
-
-            g_utf8_strncpy(newHook.dll_name, parts[IdxInLineDLLName],
-                           sizeof(newHook.dll_name) - 1);
-            g_utf8_strncpy(newHook.func_name, parts[IdxInLineFunctionName],
-                           sizeof(newHook.func_name) - 1);
-
-
             g_strstrip(parts[IdxInLineBitness]); // remove trailing whitespace
-            newHook.cc = cc_from_string(parts[IdxInLineBitness]);
-
-            bool succ_cb_before_tb;
-            succ_cb_before_tb = hk_add_cb_pair(&newHook, CB_BEFORE_TB_EXEC,
-                                                pipe_logger_before_tb_exec);
-
-            if (!succ_cb_before_tb) {
-                g_printerr("Failed to add callback pair for hook: %s\n", parts[0]);
-                return 0;
-            }
-
-            newHook.addr = g_ascii_strtoull(parts[IdxInLineAddress], NULL, 10) + correction;
-            if (hkr_add_new_hook(gemu_instance->hooker, newHook)) {
-                fc_set(&gemu_instance->hooker->fc, newHook.addr);
-                // g_print("Hooked [%llu | %012llX] %s!%s\n", newHook.addr,
-                // newHook.addr,
-                //        newHook.func_name, newHook.dll_name);
-            } else {
-                g_printerr("Hook [%ld | %012lX] %s!%s could not be added", newHook.addr,
-                           newHook.addr, newHook.func_name, newHook.dll_name);
-            }
+            CallingConvention cc = cc_from_string(parts[IdxInLineBitness]);
+            target_ulong addr = (target_long)g_ascii_strtoull(parts[IdxInLineAddress], NULL, 10) + correction;
+            hook_address(parts[IdxInLineFunctionName], parts[IdxInLineDLLName], addr, pipe_logger_before_tb_exec, cc);
         }
         return 1;
     }
@@ -932,14 +901,16 @@ void handle_loaded_library(ModuleNode *head) {
     }
 }
 
-gboolean hook_address(const char* func_name, const char *dll_name, target_long address, void* function) {
+gboolean hook_address(const char *func_name, const char *dll_name,
+                      target_long address, void *function, CallingConvention cc) {
     hook_t newHook = {.addr = 0,
             .callbacks = NULL,
             .callback_count = 0,
             .dll_name = "",
             .func_name = "",
             .out_parameter_list.number_of_outparameters = -1,
-            .in_parameters = NULL};
+            .in_parameters = NULL,
+            .cc = cc};
 
 
     g_utf8_strncpy(newHook.dll_name, dll_name,

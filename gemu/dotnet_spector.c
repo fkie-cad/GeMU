@@ -6,8 +6,7 @@
 #define fill_struct(cpu, address, struct_ptr) gemu_virtual_memory_read(cpu, address, (uint8_t *) struct_ptr, sizeof(*struct_ptr));
 #define METHOD_DESC_ALIGNMENT 8; //64bit only
 
-void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulong native_address, void* native_code_hook_function){
-    //TODO: only for 64 bit so far
+void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulong native_address, void* native_code_hook_function, bool is32bit){
     // read MethodInfo
     CORINFO_METHOD_INFO_PARTIAL_64 method_info;
     printf("read info at 0x%lX\n", info_ptr);
@@ -139,7 +138,9 @@ void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulon
         sprintf(hook_name, "JIT_0x%llX_0x%lX", token, jitted_functions_count);
         jitted_functions_count++;
         printf("address to hook: 0x%lX, name %s\n", native_address, hook_name);
-        hook_address(hook_name, "CIL", native_address, native_code_hook_function);
+        hook_address(hook_name, "CIL", native_address,
+                     native_code_hook_function,
+                     is32bit ? CC_FASTCALL_32 : CC_WIN64);
     }
 
 }
