@@ -102,7 +102,8 @@ def test_timeout(tmpdir):
         sample=copied_pe,
         time=10,
         runname="timeout_test",
-        config="win10"
+        config="win10",
+        postprocess=False,
     )
     assert "REASON FOR GEMU EXIT: timeout" in analysis_folder.runlog.read_text()
 
