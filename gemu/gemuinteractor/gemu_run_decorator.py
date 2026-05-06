@@ -1,3 +1,5 @@
+import math
+import random
 import shutil
 import subprocess
 import threading
@@ -56,7 +58,10 @@ class YaraEarlyExiter(RunDecorator):
                 continue
             print(f"checking file {dump}")
             try:
-                subprocess.check_output(f"sync '{str(dump)}'", shell=True)
+                try:
+                    subprocess.check_output(f"sync '{str(dump)}'", shell=True)
+                except subprocess.CalledProcessError:
+                    continue
                 matches = self.rules.match(str(dump))
                 self.checked_files.add(dump)
                 if matches:
@@ -120,3 +125,55 @@ class WrittenFileMerger(RunDecorator):
                         continue
                     with open(dump_path, "rb") as file_in:
                         shutil.copyfileobj(file_in, file_out)
+
+
+class MouseMover(RunDecorator):
+    """Moves mouse in a figure-eight and opens Task Manager after a delay.
+
+    Anti-evasion technique: malware often checks for human-like activity.
+    """
+
+    def __init__(self, sleep: float, gemu_instance: GemuInstance, taskmgr_delay: float = 10.0):
+        super().__init__(sleep, gemu_instance)
+        self._t = 0.0
+        self._sent_x = 0
+        self._sent_y = 0
+        self._amplitude_x = random.uniform(150, 250)
+        self._amplitude_y = random.uniform(100, 200)
+        self._speed = random.uniform(0.08, 0.12)
+        self._taskmgr_delay = taskmgr_delay
+        self._taskmgr_sent = False
+        self._elapsed = 0.0
+
+    def _randomize_loop(self):
+        """Pick new random parameters for the next figure-eight loop."""
+        self._amplitude_x = random.uniform(150, 250)
+        self._amplitude_y = random.uniform(100, 200)
+        self._speed = random.uniform(0.08, 0.12)
+
+    def _decorate(self):
+        if self._gemu_instance._monitor_sock is None:
+            return
+
+        # Randomize shape each full loop (t crosses a 2*pi boundary)
+        old_loop = int(self._t / (2 * math.pi))
+        self._t += self._speed
+        new_loop = int(self._t / (2 * math.pi))
+        if new_loop > old_loop:
+            self._randomize_loop()
+
+        # Figure-eight (lemniscate): x = Ax*sin(t), y = Ay*sin(t)*cos(t)
+        target_x = int(self._amplitude_x * math.sin(self._t))
+        target_y = int(self._amplitude_y * math.sin(self._t) * math.cos(self._t))
+        dx = target_x - self._sent_x
+        dy = target_y - self._sent_y
+        self._sent_x = target_x
+        self._sent_y = target_y
+
+        if dx != 0 or dy != 0:
+            self._gemu_instance.write_to_qemu_console(f"mouse_move {dx} {dy}\n".encode())
+
+        self._elapsed += self._sleep
+        if not self._taskmgr_sent and self._elapsed >= self._taskmgr_delay:
+            self._gemu_instance.write_to_qemu_console(b"sendkey ctrl-shift-esc\n")
+            self._taskmgr_sent = True

@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 from gemuinteractor.config_parser import get_vm_settings, GEMU_PATH
-from gemuinteractor.gemu_run_decorator import RunDecorator, YaraEarlyExiter, WrittenFileMerger
+from gemuinteractor.gemu_run_decorator import RunDecorator, YaraEarlyExiter, WrittenFileMerger, MouseMover
 from gemuinteractor.gemu_runner_single_file import GemuRunner
 from gemuinteractor.helpers import AnalysisFolder, GemuInstance
 from gemuinteractor.recipe import Recipe
@@ -44,7 +44,10 @@ def unpack_single_file(
         tracing=tracing,
     )
 
-    decorators: list[RunDecorator] = [WrittenFileMerger(sleep=2, gemu_instance=gemu_instance)]
+    decorators: list[RunDecorator] = [
+        WrittenFileMerger(sleep=2, gemu_instance=gemu_instance),
+        MouseMover(sleep=0.05, gemu_instance=gemu_instance),
+    ]
     if yararules:
         decorators.append(YaraEarlyExiter(sleep=0.1, yara_rules=yararules, gemu_instance=gemu_instance))
     runner.decorate_run(decorators)
@@ -107,7 +110,7 @@ def cli_main() -> None:
         "--postprocess",
         help="Run post-processing pipeline (default: True)",
         action=argparse.BooleanOptionalAction,
-        default=False,
+        default=True,
     )
 
     args = parser.parse_args()
