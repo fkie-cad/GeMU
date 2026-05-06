@@ -371878,6 +371878,46 @@
             ]
         ]
     },
+    "ZwDuplicateObject": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "SourceProcessHandle"
+            ],
+            [
+                "[in][out]",
+                "HANDLE",
+                "SourceHandle"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "TargetProcessHandle"
+            ],
+            [
+                "[out]",
+                "HANDLE*",
+                "TargetHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "HandleAttributes"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Options"
+            ]
+        ]
+    },
     "NtQueryDirectoryFile": {
         "return_type": "NTSTATUS",
         "parameters": [
@@ -373739,6 +373779,2166 @@
                 "[out]",
                 "ULONG*",
                 "nativeSizeOfCode"
+            ]
+        ]
+    },
+       "strrchr": {
+        "return_type": "char*",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "s"
+            ],
+            [
+                "[in]",
+                "int",
+                "c"
+            ]
+        ]
+    },
+    "memcmp": {
+        "return_type": "int32",
+        "parameters": [
+            [
+                "[in]",
+                "void*",
+                "buffer1"
+            ],
+            [
+                "[in]",
+                "void*",
+                "buffer2"
+            ],
+            [
+                "[in]",
+                "int32",
+                "count"
+            ]
+        ]
+    },
+    "NtOpenDirectoryObject": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "DirectoryHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "NtQueryDirectoryObject": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "DirectoryHandle"
+            ],
+            [
+                "[out][opt]",
+                "PVOID",
+                "Buffer"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Length"
+            ],
+            [
+                "[in]",
+                "BOOLEAN",
+                "ReturnSingleEntry"
+            ],
+            [
+                "[in]",
+                "BOOLEAN",
+                "RestartScan"
+            ],
+            [
+                "[in][out]",
+                "PULONG",
+                "Context"
+            ],
+            [
+                "[out]",
+                "PULONG",
+                "ReturnLength"
+            ]
+        ]
+    },
+    "getWindowsDirectory": {
+        "return_type": "UINT",
+        "parameters": [
+            [
+                "[out]",
+                "LPSTR",
+                "lpBuffer"
+            ],
+            [
+                "[in]",
+                "UINT",
+                "uSize"
+            ]
+        ]
+    },
+    "_strnicmp": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ]
+        ]
+    },
+    "_wcsnicmp": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ]
+        ]
+    },
+    "_mbsnicmp": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ]
+        ]
+    },
+    "_strnicmp_l": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ],
+            [
+                "[in]",
+                "_locale_t",
+                "locale"
+            ]
+        ]
+    },
+    "_wcsnicmp_l": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ],
+            [
+                "[in]",
+                "_locale_t",
+                "locale"
+            ]
+        ]
+    },
+    "_mbsnicmp_l": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ],
+            [
+                "[in]",
+                "_locale_t",
+                "locale"
+            ]
+        ]
+    },
+    "strstr": {
+        "return_type": "char*",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "str"
+            ],
+            [
+                "[in]",
+                "char*",
+                "strSearch"
+            ]
+        ]
+    },
+    "wcsstr": {
+        "return_type": "wchar_t*",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "str"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "strSearch"
+            ]
+        ]
+    },
+    "_wcsicmp": {
+        "return_type": "int32",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "string2"
+            ]
+        ]
+    },
+    "stricmp": {
+        "return_type": "int32",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char16*",
+                "string2"
+            ]
+        ]
+    },
+    "wcsrchr": {
+        "return_type": "uint16*",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "str"
+            ],
+            [
+                "[in]",
+                "wchar_t",
+                "c"
+            ]
+        ]
+    },
+    "RtlCompareUnicodeString": {
+        "return_type": "long",
+        "parameters": [
+            [
+                "[in]",
+                "PUNICODE_STRING",
+                "String1"
+            ],
+            [
+                "[in]",
+                "PUNICODE_STRING",
+                "String2"
+            ],
+            [
+                "[in]",
+                "BOOLEAN",
+                "CaseInSensitive"
+            ]
+        ]
+    },
+    "RtlCompareUnicodeStrings": {
+        "return_type": "long",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "String1"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "String1Length"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "String2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "String2Length"
+            ],
+            [
+                "[in]",
+                "BOOLEAN",
+                "CaseInSensitive"
+            ]
+        ]
+    },
+    "RtlFindCharInUnicodeString": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "int",
+                "flags"
+            ],
+            [
+                "[in]",
+                "PUNICODE_STRING",
+                "main_str"
+            ],
+            [
+                "[in]",
+                "PUNICODE_STRING",
+                "search_chars"
+            ],
+            [
+                "[in]",
+                "USHORT*",
+                "pos"
+            ]
+        ]
+    },
+    "NtOpenKey": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "KeyHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "ZwOpenKey": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "KeyHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "LdrGetDllHandle": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][opt]",
+                "PCWSTR",
+                "DllPath"
+            ],
+            [
+                "[in][opt]",
+                "PULONG",
+                "DllCharacteristics"
+            ],
+            [
+                "[in]",
+                "PUNICODE_STRING",
+                "DllName"
+            ],
+            [
+                "[out]",
+                "PVOID*",
+                "DllHandle"
+            ]
+        ]
+    },
+    "RtlQueryPackageClaims": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "TokenHandle"
+            ],
+            [
+                "[out][opt]",
+                "PWSTR",
+                "PackageFullName"
+            ],
+            [
+                "[in][out][opt]",
+                "PSIZE_T",
+                "PackageSize"
+            ],
+            [
+                "[out][opt]",
+                "PWSTR",
+                "AppId"
+            ],
+            [
+                "[in][out][opt]",
+                "PSIZE_T",
+                "AppIdSize"
+            ],
+            [
+                "[out][opt]",
+                "PGUID",
+                "DynamicID"
+            ],
+            [
+                "[out][opt]",
+                "PPS_PKG_CLAIM",
+                "PkgClaim"
+            ],
+            [
+                "[out][opt]",
+                "PULONG64",
+                "AttributesPresent"
+            ]
+        ]
+    },
+	"CreateProcessW": {
+        "return_type": "BOOL",
+        "parameters": [
+            [
+                "[in][opt]",
+                "LPCWSTR",
+                "lpApplicationName"
+            ],
+            [
+                "[in][out][opt]",
+                "LPWSTR",
+                "lpCommandLine"
+            ],
+            [
+                "[in][opt]",
+                "LPSECURITY_ATTRIBUTES",
+                "lpProcessAttributes"
+            ],
+            [
+                "[in][opt]",
+                "LPSECURITY_ATTRIBUTES",
+                "lpThreadAttributes"
+            ],
+            [
+                "[in]",
+                "BOOL",
+                "bInheritHandles"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwCreationFlags"
+            ],
+            [
+                "[in][opt]",
+                "LPVOID",
+                "lpEnvironment"
+            ],
+            [
+                "[in][opt]",
+                "LPCWSTR",
+                "lpCurrentDirectory"
+            ],
+            [
+                "[in]",
+                "LPSTARTUPINFOW",
+                "lpStartupInfo"
+            ],
+            [
+                "[out]",
+                "LPPROCESS_INFORMATION",
+                "lpProcessInformation"
+            ]
+        ]
+    },
+	"RtlCreateProcessParametersEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PRTL_USER_PROCESS_PARAMETERS*",
+                "ProcessParameters"
+            ],
+            [
+                "[in]",
+                "PCUNICODE_STRING",
+                "ImagePathName"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "DllPath"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "CurrentDirectory"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "CommandLine"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "Environment"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "WindowTitle"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "DesktopInfo"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "ShellInfo"
+            ],
+            [
+                "[in][opt]",
+                "PCUNICODE_STRING",
+                "RuntimeData"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Flags"
+            ]
+        ]
+    },
+	"NtCreateProcessEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "ProcessHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in][opt]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "ParentProcess"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Flags"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "SectionHandle"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "DebugPort"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "TokenHandle"
+            ]
+        ]
+    },
+	"NtOpenProcessToken": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "ProcessHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[out]",
+                "PHANDLE",
+                "TokenHandle"
+            ]
+        ]
+    },
+	"RtlCreateProcessReflection": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "ProcessHandle"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Flags"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "StartRoutine"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "StartContext"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "EventHandle"
+            ],
+            [
+                "[out][opt]",
+                "PPROCESS_REFLECTION_INFORMATION",
+                "ReflectionInformation"
+            ]
+        ]
+    },
+	"ZwCreateProcessEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "ProcessHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in][opt]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "ParentProcess"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Flags"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "SectionHandle"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "DebugPort"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "TokenHandle"
+            ],
+            [
+                "[in][opt]",
+                "ULONG",
+                "JobMemberLevel"
+            ]
+        ]
+    },
+	"ZwOpenProcessToken": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "ProcessHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[out]",
+                "PHANDLE",
+                "TokenHandle"
+            ]
+        ]
+    },
+	"RtlCreateProcessParameters": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PRTL_USER_PROCESS_PARAMETERS*",
+                "ProcessParameters"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "ImagePathName"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "DllPath"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "CurrentDirectory"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "CommandLine"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "Environment"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "WindowTitle"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "DesktopInfo"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "ShellInfo"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "RuntimeData"
+            ]
+        ]
+    },
+	"MLLoadLibraryA": {
+        "return_type": "HMODULE",
+        "parameters": [
+            [
+                "[in]",
+                "LPCSTR",
+                "new_mod"
+            ],
+            [
+                "[in]",
+                "HMODULE",
+                "inst_hwnd"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwCrossCodePage"
+            ]
+        ]
+    },
+	"MLLoadLibraryW": {
+        "return_type": "HMODULE",
+        "parameters": [
+            [
+                "[in]",
+                "LPCWSTR",
+                "new_mod"
+            ],
+            [
+                "[in]",
+                "HMODULE",
+                "inst_hwnd"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwCrossCodePage"
+            ]
+        ]
+    },
+    "WinStationTerminateProcess": {
+        "return_type": "Windows.Win32.Foundation.BOOLEAN",
+        "parameters": [
+            [
+                "[in][opt]",
+                "HANDLE",
+                "ServerHandle"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "ProcessId"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "ExitCode"
+            ]
+        ]
+    },
+    "_wcsicmp_l": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "_locale_t",
+                "locale"
+            ]
+        ]
+    },
+    "__crtCompareStringA": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "LPCWSTR",
+                "LocaleName"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwCmpFlags"
+            ],
+            [
+                "[in]",
+                "LPCSTR",
+                "lpString1"
+            ],
+            [
+                "[in]",
+                "int",
+                "cchCount1"
+            ],
+            [
+                "[in]",
+                "LPCSTR",
+                "lpString2"
+            ],
+            [
+                "[in]",
+                "int",
+                "cchCount2"
+            ],
+            [
+                "[in]",
+                "int",
+                "code_page"
+            ]
+        ]
+    },
+    "__crtCompareStringW": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "LPCWSTR",
+                "LocaleName"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwCmpFlags"
+            ],
+            [
+                "[in]",
+                "LPCWSTR",
+                "lpString1"
+            ],
+            [
+                "[in]",
+                "int",
+                "cchCount1"
+            ],
+            [
+                "[in]",
+                "LPCWSTR",
+                "lpString2"
+            ],
+            [
+                "[in]",
+                "int",
+                "cchCount2"
+            ]
+        ]
+    },
+    "__crtCompareStringEx": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "LPCWSTR",
+                "lpLocaleName"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwCmpFlags"
+            ],
+            [
+                "[in]",
+                "LPCWSTR",
+                "lpString1"
+            ],
+            [
+                "[in]",
+                "int",
+                "cchCount1"
+            ],
+            [
+                "[in]",
+                "LPCWSTR",
+                "lpString2"
+            ],
+            [
+                "[in]",
+                "int",
+                "cchCount2"
+            ],
+            [
+                "[in]",
+                "LPNLSVERSIONINFO",
+                "lpVersionInformation"
+            ],
+            [
+                "[in]",
+                "LPVOID",
+                "lpReserved"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.LPARAM",
+                "lParam"
+            ]
+        ]
+    },
+    "RtlCompareString": {
+        "return_type": "long",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.System.Kernel.STRING*",
+                "String1"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.System.Kernel.STRING*",
+                "String2"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.BOOLEAN",
+                "CaseInSensitive"
+            ]
+        ]
+    },
+    "RtlHashUnicodeString": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "String"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.BOOLEAN",
+                "CaseInSensitive"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "HashAlgorithm"
+            ],
+            [
+                "[out]",
+                "PULONG",
+                "HashValue"
+            ]
+        ]
+    },
+    "RtlCreateUnicodeStringFromAsciiz": {
+        "return_type": "Windows.Win32.Foundation.BOOLEAN",
+        "parameters": [
+            [
+                "[out]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "DestinationString"
+            ],
+            [
+                "[in]",
+                "LPCSTR",
+                "SourceString"
+            ]
+        ]
+    },
+    "NtOpenKeyEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "KeyHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "OpenOptions"
+            ]
+        ]
+    },
+    "NtOpenKeyTransacted": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "KeyHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "TransactionHandle"
+            ]
+        ]
+    },
+    "NtOpenKeyTransactedEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "KeyHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "OpenOptions"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "TransactionHandle"
+            ]
+        ]
+    },
+    "RtlpNtOpenKey": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "KeyHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "BaseRegOpenKey": {
+        "return_type": "error_status_t",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.System.Registry.HKEY",
+                "hKey"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "lpSubKey"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwOptions"
+            ],
+            [
+                "[in]",
+                "REGSAM",
+                "samDesired"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.System.Registry.HKEY*",
+                "phkResult"
+            ]
+        ]
+    },
+    "BasepGetComputerNameFromNtPath": {
+        "return_type": "DWORD",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "NewPath"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "NewHandle"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.PWSTR",
+                "ComputerName"
+            ],
+            [
+                "[in][out]",
+                "PULONG",
+                "ComputerNameLength"
+            ]
+        ]
+    },
+    "DllGetClassObject": {
+        "return_type": "HRESULT",
+        "parameters": [
+            [
+                "[in]",
+                "REFCLSID",
+                "rclsid"
+            ],
+            [
+                "[in]",
+                "REFIID",
+                "riid"
+            ],
+            [
+                "[out]",
+                "LPVOID*",
+                "ppv"
+            ]
+        ]
+    },
+    "GetDeviceDriverBaseNameA": {
+        "return_type": "DWORD",
+        "parameters": [
+            [
+                "[in]",
+                "LPVOID",
+                "ImageBase"
+            ],
+            [
+                "[in]",
+                "LPSTR",
+                "lpFilename"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "nSize"
+            ]
+        ]
+    },
+    "GetDeviceDriverBaseNameW": {
+        "return_type": "DWORD",
+        "parameters": [
+            [
+                "[in]",
+                "LPVOID",
+                "ImageBase"
+            ],
+            [
+                "[out]",
+                "LPWSTR",
+                "lpBaseName"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "nSize"
+            ]
+        ]
+    },
+    "strcmp": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char*",
+                "string2"
+            ]
+        ]
+    },
+    "LsaGetUserName": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][out]",
+                "Windows.Win32.Foundation.UNICODE_STRING**",
+                "string1_unknown_function"
+            ],
+            [
+                "[in][out]",
+                "Windows.Win32.Foundation.UNICODE_STRING**",
+                "string2_unknown_function"
+            ]
+        ]
+    },
+    "strchr": {
+        "return_type": "char*",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "str"
+            ],
+            [
+                "[in]",
+                "int",
+                "c"
+            ]
+        ]
+    },
+    "wcschr": {
+        "return_type": "wchar_t*",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "str"
+            ],
+            [
+                "[in]",
+                "wchar_t",
+                "c"
+            ]
+        ]
+    },
+    "wcsncmp": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "wchar_t*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "wchar_t*",
+                "string2"
+            ],
+            [
+                "[in]",
+                "size_t",
+                "count"
+            ]
+        ]
+    },
+    "lstrcmp": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "LPCSTR",
+                "lpString1"
+            ],
+            [
+                "[in]",
+                "LPCSTR",
+                "lpString2"
+            ]
+        ]
+    },
+    "RtlQueryRegistryValues": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "ULONG",
+                "RelativeTo"
+            ],
+            [
+                "[in]",
+                "PCWSTR",
+                "Path"
+            ],
+            [
+                "[in][out]",
+                "PRTL_QUERY_REGISTRY_TABLE",
+                "QueryTable"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "Context"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "Environment"
+            ]
+        ]
+    },
+    "RtlQueryRegistryValuesEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "ULONG",
+                "RelativeTo"
+            ],
+            [
+                "[in]",
+                "PCWSTR",
+                "Path"
+            ],
+            [
+                "[in][out]",
+                "PRTL_QUERY_REGISTRY_TABLE",
+                "QueryTable"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "Context"
+            ],
+            [
+                "[in][opt]",
+                "PVOID",
+                "Environment"
+            ]
+        ]
+    },
+    "RtlQueryRegistryValueWithFallback": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "PrimaryHandle"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "FallbackHandle"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "ValueName"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "ValueLength"
+            ],
+            [
+                "",
+                "PULONG",
+                "ValueType"
+            ],
+            [
+                "[out]",
+                "PVOID",
+                "ValueData"
+            ],
+            [
+                "[out]",
+                "PULONG",
+                "ResultLength"
+            ]
+        ]
+    },
+    "LdrGetDllDirectory": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "PathName"
+            ]
+        ]
+    },
+    "LdrGetDllHandleByName": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "BaseDllName"
+            ],
+            [
+                "[in][opt]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "FullDllName"
+            ],
+            [
+                "[out]",
+                "PVOID*",
+                "DllHandle"
+            ]
+        ]
+    },
+    "LdrGetDllFullName": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][opt]",
+                "PVOID",
+                "DllHandle"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "FullDllName"
+            ]
+        ]
+    },
+    "LdrGetDllPath": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "PCWSTR",
+                "DllName"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Flags"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.PWSTR*",
+                "DllPath"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.PWSTR*",
+                "SearchPaths"
+            ]
+        ]
+    },
+    "LdrGetDllHandleEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "ULONG",
+                "Flags"
+            ],
+            [
+                "[in][opt]",
+                "PCWSTR",
+                "DllPath"
+            ],
+            [
+                "[in][opt]",
+                "PULONG",
+                "DllCharacteristics"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "DllName"
+            ],
+            [
+                "[out]",
+                "PVOID*",
+                "DllHandle"
+            ]
+        ]
+    },
+    "_strcmpi": {
+        "return_type": "int",
+        "parameters": [
+            [
+                "[in]",
+                "char*",
+                "string1"
+            ],
+            [
+                "[in]",
+                "char*",
+                "string2"
+            ]
+        ]
+    },
+    "ElfOpenEventLogA": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.System.Kernel.STRING*",
+                "UNCServerNameA"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.System.Kernel.STRING*",
+                "SourceNameA"
+            ],
+            [
+                "[out]",
+                "PHANDLE",
+                "phEventLog"
+            ]
+        ]
+    },
+    "ElfOpenEventLogW": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "UNCServerNameU"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "SourceNameU"
+            ],
+            [
+                "[out]",
+                "PHANDLE",
+                "phEventLog"
+            ]
+        ]
+    },
+    "GetDeviceDriverFileNameA": {
+        "return_type": "DWORD",
+        "parameters": [
+            [
+                "[in]",
+                "LPVOID",
+                "ImageBase"
+            ],
+            [
+                "[out]",
+                "LPSTR",
+                "lpFilename"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "nSize"
+            ]
+        ]
+    },
+    "GetDeviceDriverFileNameW": {
+        "return_type": "DWORD",
+        "parameters": [
+            [
+                "[in]",
+                "LPVOID",
+                "ImageBase"
+            ],
+            [
+                "[out]",
+                "LPWSTR",
+                "lpFilename"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "nSize"
+            ]
+        ]
+    },
+    "NtOpenEvent": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "EventHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "NtOpenEventPair": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "EventPairHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "NtOpenKeyedEvent": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "KeyedEventHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "NtOpenProcessTokenEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "ProcessHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "HandleAttributes"
+            ],
+            [
+                "[out]",
+                "PHANDLE",
+                "TokenHandle"
+            ]
+        ]
+    },
+    "NtCreateEvent": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "EventHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in][opt]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ],
+            [
+                "[in]",
+                "EVENT_TYPE",
+                "EventType"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.BOOLEAN",
+                "InitialState"
+            ]
+        ]
+    },
+    "NtCreateEventPair": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[out]",
+                "PHANDLE",
+                "EventPairHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in][opt]",
+                "POBJECT_ATTRIBUTES",
+                "ObjectAttributes"
+            ]
+        ]
+    },
+    "RtlIsDosDeviceName_U": {
+        "return_type": "ULONG",
+        "parameters": [
+            [
+                "[in]",
+                "PCWSTR",
+                "DosFileName"
+            ]
+        ]
+    },
+    "RtlQueryEnvironmentVariable_U": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][opt]",
+                "PVOID",
+                "Environment"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "Name"
+            ],
+            [
+                "[in][out]",
+                "Windows.Win32.Foundation.UNICODE_STRING*",
+                "Value"
+            ]
+        ]
+    },
+    "RtlQueryEnvironmentVariable": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][out]",
+                "PVOID",
+                "Environment"
+            ],
+            [
+                "[in][out]",
+                "Windows.Win32.Foundation.PWSTR",
+                "Name"
+            ],
+            [
+                "[in]",
+                "SIZE_T",
+                "NameLength"
+            ],
+            [
+                "[in][out]",
+                "Windows.Win32.Foundation.PWSTR",
+                "Value"
+            ],
+            [
+                "[in]",
+                "SIZE_T",
+                "ValueLength"
+            ],
+            [
+                "[in][out]",
+                "SIZE_T*",
+                "ReturnLength"
+            ]
+        ]
+    },
+    "RtlQueryInformationAcl": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "Windows.Win32.Security.ACL*",
+                "Acl"
+            ],
+            [
+                "[in][out]",
+                "PVOID",
+                "AclInformation"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "AclInformationLength"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Security.ACL_INFORMATION_CLASS",
+                "AclInformationClass"
+            ]
+        ]
+    },
+    "RtlQueryModuleInformation": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in][out]",
+                "PULONG",
+                "InformationLength"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "SizePerModule"
+            ],
+            [
+                "[out]",
+                "PVOID",
+                "InformationBuffer"
+            ]
+        ]
+    },
+    "RtlQueryPackageIdentity": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "PVOID",
+                "TokenObject"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.PWSTR",
+                "PackageFullName"
+            ],
+            [
+                "[in][out]",
+                "SIZE_T*",
+                "PackageSize"
+            ],
+            [
+                "[out][opt]",
+                "Windows.Win32.Foundation.PWSTR",
+                "AppId"
+            ],
+            [
+                "[in][out][opt]",
+                "SIZE_T*",
+                "AppIdSize"
+            ],
+            [
+                "[out][opt]",
+                "Windows.Win32.Foundation.BOOLEAN*",
+                "Packaged"
+            ]
+        ]
+    },
+    "RtlQueryPackageIdentityEx": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "TokenHandle"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.PWSTR",
+                "PackageFullName"
+            ],
+            [
+                "[in][out]",
+                "SIZE_T*",
+                "PackageSize"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Foundation.PWSTR",
+                "AppId"
+            ],
+            [
+                "[in][out][opt]",
+                "SIZE_T*",
+                "AppIdSize"
+            ],
+            [
+                "[out][opt]",
+                "PGUID",
+                "DynamicId"
+            ],
+            [
+                "[out][opt]",
+                "PULONG64",
+                "Flags"
+            ]
+        ]
+    },
+    "StrChrA_MB": {
+        "return_type": "LPCSTR",
+        "parameters": [
+            [
+                "[in]",
+                "LPCSTR",
+                "pszStart"
+            ],
+            [
+                "[in]",
+                "char",
+                "wMatch"
+            ]
+        ]
+    },
+    "SHGetFolderPathEx": {
+        "return_type": "HRESULT",
+        "parameters": [
+            [
+                "[in]",
+                "GUID",
+                "rfid"
+            ],
+            [
+                "[in]",
+                "DWORD",
+                "dwFlags"
+            ],
+            [
+                "[in][opt]",
+                "HANDLE",
+                "hToken"
+            ],
+            [
+                "[out]",
+                "LPWSTR",
+                "pszPath"
+            ],
+            [
+                "[in]",
+                "UINT",
+                "cchPath"
+            ]
+        ]
+    },
+    "NtQuerySecurityObject": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "Handle"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Security.OBJECT_SECURITY_INFORMATION",
+                "SecurityInformation"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Security.PSECURITY_DESCRIPTOR",
+                "SecurityDescriptor"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Length"
+            ],
+            [
+                "[out]",
+                "PULONG",
+                "LengthNeeded"
+            ]
+        ]
+    },
+    "RtlQuerySecurityObject": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "Handle"
+            ],
+            [
+                "[in]",
+                "Windows.Win32.Security.OBJECT_SECURITY_INFORMATION",
+                "SecurityInformation"
+            ],
+            [
+                "[out]",
+                "Windows.Win32.Security.PSECURITY_DESCRIPTOR",
+                "SecurityDescriptor"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Length"
+            ],
+            [
+                "[out]",
+                "PULONG",
+                "LengthNeeded"
+            ]
+        ]
+    },
+    "RtlpGetDeviceFamilyInfoEnum": {
+        "return_type": "void",
+        "parameters": [
+            [
+                "[out][opt]",
+                "ULONGLONG*",
+                "pullUAPInfo"
+            ],
+            [
+                "[out][opt]",
+                "DWORD*",
+                "pulDeviceFamily"
+            ],
+            [
+                "[out][opt]",
+                "DWORD*",
+                "pulDeviceForm"
             ]
         ]
     }
