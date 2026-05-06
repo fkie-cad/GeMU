@@ -78,6 +78,8 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process,
                                     cJSON *output);
 
 void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process);
+void handle_ZwDuplicateObject_exit(cJSON *output, WinProcess *process,
+                                   int source_process_handle);
 
 cJSON *read_out_parameters(Gemu *gemu, CPUState *cpu, const char *func_name,
                            const char *dll_name, int number_of_outparameters,

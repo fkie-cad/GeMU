@@ -371838,6 +371838,46 @@
             ]
         ]
     },
+    "NtDuplicateObject": {
+        "return_type": "NTSTATUS",
+        "parameters": [
+            [
+                "[in]",
+                "HANDLE",
+                "SourceProcessHandle"
+            ],
+            [
+                "[in][out]",
+                "HANDLE",
+                "SourceHandle"
+            ],
+            [
+                "[in]",
+                "HANDLE",
+                "TargetProcessHandle"
+            ],
+            [
+                "[out]",
+                "HANDLE*",
+                "TargetHandle"
+            ],
+            [
+                "[in]",
+                "ACCESS_MASK",
+                "DesiredAccess"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "HandleAttributes"
+            ],
+            [
+                "[in]",
+                "ULONG",
+                "Options"
+            ]
+        ]
+    },
     "NtQueryDirectoryFile": {
         "return_type": "NTSTATUS",
         "parameters": [

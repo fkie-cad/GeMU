@@ -133,6 +133,50 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
 }
 
 
+void handle_ZwDuplicateObject_exit(cJSON *output, WinProcess *process,
+                                   int source_process_handle) {
+    cJSON *source_item = cJSON_GetObjectItemCaseSensitive(output, "SourceHandle");
+    cJSON *target_item = cJSON_GetObjectItemCaseSensitive(output, "TargetHandle");
+    if (!source_item || !target_item) {
+        return;
+    }
+    double source_handle_raw = source_item->valuedouble;
+    double target_handle_raw = target_item->valuedouble;
+    if (target_handle_raw <= 0 || target_handle_raw > INT_MAX) {
+        return;
+    }
+    int target_handle = (int)target_handle_raw;
+
+    // When SourceHandle is NtCurrentProcess (0xFFFFFFFF), the caller is asking
+    // for a handle to the process that SourceProcessHandle refers to.
+    if (source_handle_raw > INT_MAX || source_handle_raw < 0) {
+        if (source_process_handle > 0 &&
+            g_hash_table_contains(process->process_handles,
+                                  GINT_TO_POINTER(source_process_handle))) {
+            int pid = GPOINTER_TO_INT(g_hash_table_lookup(
+                process->process_handles, GINT_TO_POINTER(source_process_handle)));
+            printf("ZwDuplicateObject: pseudo-handle -> target_handle=%d maps to PID %d\n",
+                   target_handle, pid);
+            g_hash_table_insert(process->process_handles,
+                                GINT_TO_POINTER(target_handle), GINT_TO_POINTER(pid));
+        }
+        return;
+    }
+
+    int source_handle = (int)source_handle_raw;
+    if (source_handle <= 0) {
+        return;
+    }
+    if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(source_handle))) {
+        int pid = GPOINTER_TO_INT(g_hash_table_lookup(process->process_handles,
+                                                       GINT_TO_POINTER(source_handle)));
+        printf("ZwDuplicateObject: target_handle=%d maps to PID %d\n", target_handle, pid);
+        g_hash_table_insert(process->process_handles,
+                            GINT_TO_POINTER(target_handle), GINT_TO_POINTER(pid));
+    }
+}
+
+
 void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJSON* output) {
     // printf("I am in ZwMapViewOfSection\n");
     if (!cJSON_GetObjectItemCaseSensitive(output, "SectionHandle")) {
@@ -145,7 +189,8 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
     target_ulong pid = process->ID;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         pid = (target_ulong) g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle));
-        // printf("ZwMapViewOfSection injection into PID %li\n", pid);
+        printf("ZwMapViewOfSection injection into PID %li\n", pid);
+        g_hash_table_insert(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(pid), NULL);
         struct MappedRange* rangeptr = g_hash_table_lookup(process->section_handles, GINT_TO_POINTER(sectionHandle));
         if (rangeptr == NULL) {
             // printf("could not find the correct range for the handle therefore a shared state is not possible\n");
@@ -253,7 +298,12 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
         case NtCreateUserProcess:
             handle_NtCreateUserProcess_exit(gemu, process, output, cpu);
             break;
-    
+
+        case NtDuplicateObject:
+            handle_ZwDuplicateObject_exit(output, process,
+                                          hook->cached_source_process_handle);
+            break;
+
         default:
             break;
     }
@@ -305,6 +355,9 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         }
         if (strcmp(func_name, "ZwMapViewOfSection") == 0) {
             handle_ZwMapViewOfSection_exit(gemu, process, output);
+        }
+        if (strcmp(func_name, "ZwDuplicateObject") == 0) {
+            handle_ZwDuplicateObject_exit(output, process, 0);
         }
     }
 
@@ -489,6 +542,9 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
         // printf("handling a special API %s for ZwMapViewOfSection\n", func_name);
         return true;
     }
+    if (strcmp(func_name, "ZwDuplicateObject") == 0) {
+        return true;
+    }
     return false;
 }
 
@@ -528,6 +584,9 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
             // printf("handling a special API %s for NtOpenFile\n", func_name);
             handle_NtOpenFile(gemu_instance, cpu, process, dll_name, func_name,
                               &hook->out_parameter_list, cc);
+            return true;
+        case NtDuplicateObject:
+            hook->cached_source_process_handle = (int)get_parameter(cpu, 0, cc);
             return true;
         default:
             return false;

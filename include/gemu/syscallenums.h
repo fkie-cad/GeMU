@@ -11,6 +11,7 @@ typedef enum {
     NtMapViewOfSection,
     NtCreateUserProcess,
     NtOpenFile,
+    NtDuplicateObject,
     NUM_SYSCALLS
 } syscall_t;
 
@@ -25,6 +26,7 @@ static const char* SYSCALL_NAMES[] = {
     "NtMapViewOfSection",
     "NtCreateUserProcess",
     "NtOpenFile",
+    "NtDuplicateObject",
     "NUM_SYSCALLS"
 };
 #endif
