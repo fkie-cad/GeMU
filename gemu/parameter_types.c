@@ -150,8 +150,8 @@ static void fill_processinformation(CPUState *cpu, QWORD value, cJSON *processin
     g_hash_table_insert(gemu->pids_to_lookout_for, GINT_TO_POINTER(dwProcessId), NULL);
     cJSON_AddNumberToObject(processinformation, "ProcessId", dwProcessId);
     cJSON_AddNumberToObject(processinformation, "ThreadId", dwThreadId);
-    cJSON_AddNumberToObject(processinformation, "hProcess", hProcess);
-    cJSON_AddNumberToObject(processinformation, "hThread", hThread);
+    cJSON_AddUint64ToObject(processinformation, "hProcess", hProcess);
+    cJSON_AddUint64ToObject(processinformation, "hThread", hThread);
     g_hash_table_insert(process->process_handles, GINT_TO_POINTER(hProcess), GINT_TO_POINTER(dwProcessId));
 }
 
@@ -166,7 +166,7 @@ static bool handle_process_information(CPUState *cpu, const FunctionParameter *p
 static bool handle_do_not_dereference(CPUState *cpu, const FunctionParameter *param,
                                       QWORD value, cJSON *output, WinProcess *process,
                                       bool is32bit) {
-    cJSON_AddNumberToObject(output, param->name, value);
+    cJSON_AddUint64ToObject(output, param->name, value);
     return true;
 }
 
@@ -174,7 +174,7 @@ static bool handle_dereference_default(CPUState *cpu, const FunctionParameter *p
                                        QWORD value, cJSON *output, WinProcess *process,
                                        bool is32bit) {
     int dereferences = count_dereferences(param->type);
-    cJSON_AddNumberToObject(output, param->name,
+    cJSON_AddUint64ToObject(output, param->name,
                             dereference_pointer(cpu, value, dereferences, is32bit));
     return true;
 }

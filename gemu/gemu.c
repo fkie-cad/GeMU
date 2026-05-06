@@ -121,24 +121,27 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
     //        cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint,
     //        cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint,
     //        process->ID);
-    if (cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint > 0 &&
-        cJSON_GetObjectItemCaseSensitive(output, "ClientId")->valueint > 0) {
+    if (cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle") &&
+        cJSON_GetObjectItemCaseSensitive(output, "ClientId") &&
+        cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")) > 0 &&
+        cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ClientId")) > 0) {
         g_hash_table_insert(
                 process->process_handles,
-                GINT_TO_POINTER(cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")
-                        ->valueint),
-                GINT_TO_POINTER(cJSON_GetObjectItemCaseSensitive(output, "ClientId")
-                        ->valueint));
+                GINT_TO_POINTER((int)cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle"))),
+                GINT_TO_POINTER((int)cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ClientId"))));
     }
 }
 
 
 void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJSON* output) {
     // printf("I am in ZwMapViewOfSection\n");
-    int sectionHandle = cJSON_GetObjectItemCaseSensitive(output, "SectionHandle")->valueint;
-    int handle = cJSON_GetObjectItemCaseSensitive(output, "hProcess")->valueint;
-    hwaddr remoteAddress = cJSON_GetObjectItemCaseSensitive(output, "remoteAddress")->valueint;
-    size_t ViewSize = cJSON_GetObjectItemCaseSensitive(output, "ViewSize")->valueint;
+    if (!cJSON_GetObjectItemCaseSensitive(output, "SectionHandle")) {
+        return;
+    }
+    int sectionHandle = (int)cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "SectionHandle"));
+    int handle = (int)cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "hProcess"));
+    hwaddr remoteAddress = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "remoteAddress"));
+    size_t ViewSize = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ViewSize"));
     target_ulong pid = process->ID;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         pid = (target_ulong) g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle));
@@ -171,7 +174,7 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
 
 static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *process, cJSON* output, CPUState* cpu) {
     // printf("I am in NtCreateUserProcess\n");
-    int pAttributeList = cJSON_GetObjectItemCaseSensitive(output, "AttributeList")->valueint;
+    target_ulong pAttributeList = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "AttributeList"));
     if(pAttributeList == 0){
         printf("Warning: Could not get PID from NtCreateUserProcess. AttributeList is NULL.\n");
         return;
@@ -196,7 +199,7 @@ static void handle_NtCreateUserProcess_exit(Gemu *gemu_instance, WinProcess *pro
         return;
     }
 
-    target_ulong process_handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
+    target_ulong process_handle = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle"));
     printf("PROCESS_CREATED parent=%llu child=%llu image=unknown\n",
            process->ID, client_id.ProcessId);
     g_hash_table_insert(gemu_instance->pids_to_lookout_for,
@@ -310,8 +313,8 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
             handle_getJit_exit(gemu, ret, cpu, hook->cc);
         }
         if (strcmp(func_name, "compileMethod") == 0) {
-            int native_address = cJSON_GetObjectItemCaseSensitive(output, "nativeEntry")->valueint;
-            handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, native_address, pipe_logger_before_tb_exec, cc_is32bit(hook->cc));
+            target_ulong native_address = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "nativeEntry"));
+            handle_jit_compile_method(cpu, cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")), native_address, pipe_logger_before_tb_exec, cc_is32bit(hook->cc));
         }
     }
 
@@ -326,7 +329,7 @@ void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
                                  CallingConvention cc) {
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
                                     out_parameter_list, process, cc);
-    int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
+    int handle = (int)cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle"));
     // This is hacky, but in most cases, handle 7 is the current process
     if ((handle == 0) || (handle == 7)) { 
         printf("Removing PID %lli\n", process->ID);
@@ -341,12 +344,9 @@ void handle_ZwTerminateProcess(Gemu *gemu_instance, CPUState *cpu,
 }
 
 void dump_WriteVirtualMemory(cJSON *output, CPUState *cpu, WinProcess *process, int pid){
-    QWORD start = cJSON_GetObjectItemCaseSensitive(output, "Buffer")->valueint;
-    QWORD addr =
-            cJSON_GetObjectItemCaseSensitive(output, "BaseAddress")->valueint;
-    QWORD size =
-            cJSON_GetObjectItemCaseSensitive(output, "NumberOfBytesToWrite")
-                    ->valueint;
+    QWORD start = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "Buffer"));
+    QWORD addr = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "BaseAddress"));
+    QWORD size = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "NumberOfBytesToWrite"));
     if (size > 0x40000000 || extracted_data_size_files > 10e+9 || file_counter > 100000) {
         return;
     }
@@ -369,7 +369,7 @@ void handle_ZwWriteVirtualMemory(Gemu *gemu_instance, CPUState *cpu,
                                  CallingConvention cc) {
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
                                     out_parameter_list, process, cc);
-    int handle = cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle")->valueint;
+    int handle = (int)cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ProcessHandle"));
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         int pid = GPOINTER_TO_INT(g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle)));
         printf("found injection into PID %i\n", pid);
@@ -393,8 +393,8 @@ void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
         return;
     }
 
-    QWORD start = cJSON_GetObjectItemCaseSensitive(output, "Buffer")->valueint;
-    QWORD size = cJSON_GetObjectItemCaseSensitive(output, "Length")->valueint;
+    QWORD start = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "Buffer"));
+    QWORD size = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "Length"));
     if (size > 0x40000000) {
         return;
     }
@@ -404,7 +404,7 @@ void handle_ZwWriteFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
     char filename[261];
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
-    QWORD filehandle = cJSON_GetObjectItemCaseSensitive(output, "FileHandle")->valueint;
+    QWORD filehandle = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "FileHandle"));
     sprintf(filename, "dumps/%llu_%llu_writtenfile_%lu_nr_%d", process->ID, filehandle,
             (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, file_counter);
     file_counter += 1;
@@ -427,7 +427,7 @@ static void handle_NtOpenFile(Gemu *gemu_instance, CPUState *cpu, WinProcess *pr
     cJSON *output = read_parameters(gemu_instance, cpu, func_name, dll_name,
                                     out_parameter_list, process, cc);
 
-    QWORD attributes_addr = cJSON_GetObjectItemCaseSensitive(output, "ObjectAttributes")->valueint;
+    QWORD attributes_addr = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ObjectAttributes"));
 
     cJSON_Delete(output);
 
@@ -631,7 +631,7 @@ static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
 
     if (gemu_instance->tracking_mode & TRACKING_BASICBLOCK_DOTNET){
         if (unlikely(strncmp(func_name, "compileMethod", 13) == 0)) {
-            handle_jit_compile_method(cpu, cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")->valueint, 0, pipe_logger_before_tb_exec, cc_is32bit(hook->cc));
+            handle_jit_compile_method(cpu, cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "corinfo_method_info")), 0, pipe_logger_before_tb_exec, cc_is32bit(hook->cc));
         }
     }
     // output is now owned by the hook's in_parameters — freed at exit

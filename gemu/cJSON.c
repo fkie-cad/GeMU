@@ -44,6 +44,8 @@
 #include <limits.h>
 #include <ctype.h>
 #include <float.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #ifdef ENABLE_LOCALES
 #include <locale.h>
@@ -557,8 +559,13 @@ static cJSON_bool print_number(const cJSON * const item, printbuffer * const out
         return false;
     }
 
+    /* Exact 64-bit unsigned integer — print without float conversion */
+    if (item->type & cJSON_IsUint64)
+    {
+        length = sprintf((char*)number_buffer, "%" PRIu64, item->valueuint64);
+    }
     /* This checks for NaN and Infinity */
-    if (isnan(d) || isinf(d))
+    else if (isnan(d) || isinf(d))
     {
         length = sprintf((char*)number_buffer, "null");
     }
@@ -2136,6 +2143,18 @@ CJSON_PUBLIC(cJSON*) cJSON_AddNumberToObject(cJSON * const object, const char * 
     return NULL;
 }
 
+CJSON_PUBLIC(cJSON*) cJSON_AddUint64ToObject(cJSON * const object, const char * const name, const uint64_t number)
+{
+    cJSON *number_item = cJSON_CreateUint64(number);
+    if (add_item_to_object(object, name, number_item, &global_hooks, false))
+    {
+        return number_item;
+    }
+
+    cJSON_Delete(number_item);
+    return NULL;
+}
+
 CJSON_PUBLIC(cJSON*) cJSON_AddStringToObject(cJSON * const object, const char * const name, const char * const string)
 {
     cJSON *string_item = cJSON_CreateString(string);
@@ -2452,6 +2471,20 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateNumber(double num)
     return item;
 }
 
+CJSON_PUBLIC(cJSON *) cJSON_CreateUint64(uint64_t num)
+{
+    cJSON *item = cJSON_New_Item(&global_hooks);
+    if(item)
+    {
+        item->type = cJSON_Number | cJSON_IsUint64;
+        item->valueuint64 = num;
+        item->valuedouble = (double)num;
+        item->valueint = (num > (uint64_t)INT_MAX) ? INT_MAX : (int)num;
+    }
+
+    return item;
+}
+
 CJSON_PUBLIC(cJSON *) cJSON_CreateString(const char *string)
 {
     cJSON *item = cJSON_New_Item(&global_hooks);
@@ -2725,6 +2758,7 @@ CJSON_PUBLIC(cJSON *) cJSON_Duplicate(const cJSON *item, cJSON_bool recurse)
     newitem->type = item->type & (~cJSON_IsReference);
     newitem->valueint = item->valueint;
     newitem->valuedouble = item->valuedouble;
+    newitem->valueuint64 = item->valueuint64;
     if (item->valuestring)
     {
         newitem->valuestring = (char*)cJSON_strdup((unsigned char*)item->valuestring, &global_hooks);
