@@ -12,6 +12,7 @@
 #include "gemu/win_spector.h"
 #include "gemu/dotnet_spector.h"
 #include "syscalltable.c"
+#include "target/i386/cpu.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -548,6 +549,21 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
     return false;
 }
 
+// WIP: patches a NULL timeout on NtAlpcSendWaitReceivePort to 100ms to prevent
+// an infinite block when the target ALPC service is not running.
+static void handle_NtAlpcSendWaitReceivePort_entry(CPUState *cpu) {
+    QWORD timeout_ptr = get_parameter(cpu, 7, CC_SYSCALL_64);
+    if (timeout_ptr != 0) {
+        return;
+    }
+    INT64 timeout_value = -1000000; // 100ms relative timeout in 100ns units
+    target_ulong rsp = cpu->env_ptr->regs[R_ESP];
+    target_ulong timeout_addr = rsp - 16;
+    gemu_virtual_memory_write(cpu, timeout_addr, (uint8_t *)&timeout_value, 8);
+    gemu_virtual_memory_write(cpu, rsp + (8 + 7 * 8), (uint8_t *)&timeout_addr, 8);
+    printf("NtAlpcSendWaitReceivePort: patched NULL timeout to 100ms\n");
+}
+
 static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu, const char *dll_name,
                          syscall_t syscall, WinProcess *process, syscall_hook_t *hook,
                          CallingConvention cc) {
@@ -587,6 +603,9 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
             return true;
         case NtDuplicateObject:
             hook->cached_source_process_handle = (int)get_parameter(cpu, 0, cc);
+            return true;
+        case NtAlpcSendWaitReceivePort:
+            handle_NtAlpcSendWaitReceivePort_entry(cpu);
             return true;
         default:
             return false;

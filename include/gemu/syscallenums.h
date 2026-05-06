@@ -12,6 +12,7 @@ typedef enum {
     NtCreateUserProcess,
     NtOpenFile,
     NtDuplicateObject,
+    NtAlpcSendWaitReceivePort,
     NUM_SYSCALLS
 } syscall_t;
 
@@ -27,6 +28,7 @@ static const char* SYSCALL_NAMES[] = {
     "NtCreateUserProcess",
     "NtOpenFile",
     "NtDuplicateObject",
+    "NtAlpcSendWaitReceivePort",
     "NUM_SYSCALLS"
 };
 #endif
