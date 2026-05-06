@@ -69,6 +69,7 @@ def setup_gemu_and_shellcode():
 SHELLCODE_TEST_NAMES = (
     "injection",
     "ntmapviewofsection_injection",
+    "ntduplicateobject_injection",
     "owninjection",
     "owninjectionmemcpy",
     "writeprocessmemory",
@@ -155,3 +156,27 @@ def assert_regular_expression_matches_on_file(file_path: Path, regex: str):
             assert True
             return
     assert False
+
+
+@pytest.mark.emulation
+@pytest.mark.parametrize("bitness,trackingmode", product((32, 64), ("syscall", "basicblock")))
+def test_ntduplicateobject_injection_detected(compiled_tests_folder, bitness, trackingmode):
+    """NtDuplicateObject-based injection must be detected despite the
+    process handle arriving via handle duplication rather than OpenProcess."""
+    sample_path = compile_test(compiled_tests_folder, "ntduplicateobject_injection", bitness)
+    yararules = TEST_FOLDER / "shellcode.yarc"
+
+    analysis_folder = unpack_single_file(
+        sample=sample_path,
+        config="win10",
+        time=60,
+        runname="gemutest-ntduplicate",
+        yararules=yararules,
+        trackingmode=trackingmode,
+        dotnet="off",
+    )
+    runlog = analysis_folder.runlog.read_text()
+    # Confirm NtDuplicateObject was logged (handle duplication was tracked)
+    assert "ZwDuplicateObject" in runlog or "NtDuplicateObject" in runlog
+    # Confirm the injected shellcode was still detected
+    assert "match" in runlog.split("\n")[-4]
