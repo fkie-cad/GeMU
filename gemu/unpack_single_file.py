@@ -107,7 +107,7 @@ def cli_main() -> None:
         "--postprocess",
         help="Run post-processing pipeline (default: True)",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
     )
 
     args = parser.parse_args()

@@ -94,6 +94,8 @@ class DumpIndexer(PostProcessor):
         context.results["dump_stats"] = stats
 
     def _index_from_zip(self, dumps_zip: Path, dumps: list[dict], stats: dict) -> None:
+        if not dumps_zip.exists():
+            return
         with zipfile.ZipFile(dumps_zip, "r") as zf:
             entries = sorted(zf.infolist(), key=lambda i: i.filename)
             for entry in entries:

@@ -1,4 +1,3 @@
-#define USE_SYSCALL_NAMES
 #include "gemu/callbacks.h"
 #include "gemu/fastcheck.h"
 #include "gemu/mappedwaitinglist.h"
@@ -181,7 +180,7 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
 
         uint64_t length = section->end - section->start;
         uint8_t *buf = malloc(length + 1);
-        gemu_virtual_memory_rw(cpu, section->start, buf, length, false);
+        gemu_virtual_memory_read(cpu, section->start, buf, length);
         extracted_data_size += length;
         char filename[261];
         struct timespec now;
@@ -452,7 +451,7 @@ static bool dump_section_to_file(CPUState *cpu, struct Node *section, WinProcess
 
     uint8_t *buf = malloc(length);
 
-    gemu_virtual_memory_rw(cpu, section->start, buf, length, false);
+    gemu_virtual_memory_read(cpu, section->start, buf, length);
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 
@@ -504,7 +503,7 @@ void gemu_dump_code_pages(CPUState *cpu, WinProcess *process) {
         size_t scan_len = length < HASH_SCAN_SIZE ? length : HASH_SCAN_SIZE;
         uint8_t scan_buf[HASH_SCAN_SIZE] = {0};
 
-        int ret = gemu_virtual_memory_rw(cpu, current->start, scan_buf, scan_len, false);
+        int ret = gemu_virtual_memory_read(cpu, current->start, scan_buf, scan_len);
         if (ret != 0) {
             fprintf(stderr, "Failed to read memory for hash at 0x%lx\n", current->start);
             continue;

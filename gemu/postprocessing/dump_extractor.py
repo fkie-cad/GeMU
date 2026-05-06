@@ -44,6 +44,8 @@ class DumpExtractor:
             self._yara_counts[match["filename"]].append(match["rule_name"])
 
     def extract(self):
+        if not self.analysis_folder.dumps_zip.exists():
+            return
         self._get_yara_matches()
         self._get_similarity_representatives()
         self._build_indexes()

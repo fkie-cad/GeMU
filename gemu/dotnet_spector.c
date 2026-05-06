@@ -3,11 +3,10 @@
 #include "gemu/gemu.h"
 #include <stdio.h>
 
-#define fill_struct(cpu, address, struct_ptr) gemu_virtual_memory_rw(cpu, address, (uint8_t *) struct_ptr, sizeof(*struct_ptr), 0);
+#define fill_struct(cpu, address, struct_ptr) gemu_virtual_memory_read(cpu, address, (uint8_t *) struct_ptr, sizeof(*struct_ptr));
 #define METHOD_DESC_ALIGNMENT 8; //64bit only
 
-void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulong native_address, void* native_code_hook_function){
-    //TODO: only for 64 bit so far
+void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulong native_address, void* native_code_hook_function, bool is32bit){
     // read MethodInfo
     CORINFO_METHOD_INFO_PARTIAL_64 method_info;
     printf("read info at 0x%lX\n", info_ptr);
@@ -27,7 +26,7 @@ void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulon
     }
     uint8_t il_code[0x1000];
 
-    gemu_virtual_memory_rw(cpu, method_info.ILCode, il_code, limited_il_size, 0);
+    gemu_virtual_memory_read(cpu, method_info.ILCode, il_code, limited_il_size);
     for(int i = 0; i<limited_il_size; i++){
         printf("%02hhx ", il_code[i]);
         if (i%32==31){
@@ -70,7 +69,7 @@ void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulon
     printf("typedef token: 0x%X\n", typedef_token);
 
     uint8_t buf[256];
-    gemu_virtual_memory_rw(cpu, chunk.m_methodTable, buf, 128,0);
+    gemu_virtual_memory_read(cpu, chunk.m_methodTable, buf, 128);
 
     WORD slot_num = method_desc.m_wSlotNumber;
     if ((method_desc.m_wFlags & 0x8000) == 0){
@@ -79,7 +78,7 @@ void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulon
     QWORD slot_address = (chunk.m_methodTable + ((slot_num >> 3) << 3) + 0x40) + ((slot_num & 7) << 3);
     QWORD slot;
     printf("\nslot num: 0x%X, slot address: 0x%llX\n", slot_num, slot_address);
-    gemu_virtual_memory_rw(cpu, slot_address, (uint8_t*)&slot, sizeof(slot), 0);
+    gemu_virtual_memory_read(cpu, slot_address, (uint8_t*)&slot, sizeof(slot));
     printf("slot(points to code): 0x%llX\n\n", slot);
 
     EEClass class;
@@ -119,11 +118,11 @@ void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulon
 
     buf[0] = buf[1] = '?';
     buf[2] = 0;
-    gemu_virtual_memory_rw(cpu, layout_flat.m_base, buf, 2, 0);
+    gemu_virtual_memory_read(cpu, layout_flat.m_base, buf, 2);
     printf("Flat base content starts with: %s\n", buf);
     buf[0] = buf[1] = '?';
     buf[2] = 0;
-    gemu_virtual_memory_rw(cpu, layout_loaded.m_base, buf, 2, 0);
+    gemu_virtual_memory_read(cpu, layout_loaded.m_base, buf, 2);
     printf("Loaded base content starts with: %s\n", buf);
     printf("\n");
 
@@ -139,7 +138,9 @@ void handle_jit_compile_method(CPUState *cpu, target_ulong info_ptr, target_ulon
         sprintf(hook_name, "JIT_0x%llX_0x%lX", token, jitted_functions_count);
         jitted_functions_count++;
         printf("address to hook: 0x%lX, name %s\n", native_address, hook_name);
-        hook_address(hook_name, "CIL", native_address, native_code_hook_function);
+        hook_address(hook_name, "CIL", native_address,
+                     native_code_hook_function,
+                     is32bit ? CC_FASTCALL_32 : CC_WIN64);
     }
 
 }

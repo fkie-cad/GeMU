@@ -18,8 +18,26 @@ target_ulong get_current_pc(CPUState *cpu);
 
 int gemu_physical_memory_rw(hwaddr addr, uint8_t *buf, int len, bool is_write);
 
+static inline int gemu_physical_memory_read(hwaddr addr, uint8_t *buf, int len) {
+    return gemu_physical_memory_rw(addr, buf, len, false);
+}
+
+static inline int gemu_physical_memory_write(hwaddr addr, const uint8_t *buf, int len) {
+    return gemu_physical_memory_rw(addr, (uint8_t *)buf, len, true);
+}
+
 int gemu_virtual_memory_rw(CPUState *env, target_ulong addr, uint8_t *buf,
                            int len, bool is_write);
+
+static inline int gemu_virtual_memory_read(CPUState *env, target_ulong addr,
+                                           uint8_t *buf, int len) {
+    return gemu_virtual_memory_rw(env, addr, buf, len, false);
+}
+
+static inline int gemu_virtual_memory_write(CPUState *env, target_ulong addr,
+                                            const uint8_t *buf, int len) {
+    return gemu_virtual_memory_rw(env, addr, (uint8_t *)buf, len, true);
+}
 
 // Reads UNICODE string from guest memory via virtual address to buffer
 // Returns number of characters read

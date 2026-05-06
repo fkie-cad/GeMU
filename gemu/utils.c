@@ -219,7 +219,7 @@ void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_u
     if (strstr(buf, "QEMU")) {
         replaceSubstring(buf, "QEMU", "GeMU");
         for (i = 0; i < maxlen; i++) {
-            gemu_virtual_memory_rw(cpu, guest_va + offset * i, (uint8_t *) &buf[i], 1, 1);
+            gemu_virtual_memory_write(cpu, guest_va + offset * i, (uint8_t *) &buf[i], 1);
             if (buf[i] == 0) {
                 break;
             }
@@ -228,7 +228,7 @@ void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_u
     if (strstr(buf, "qemu")){
         replaceSubstring(buf, "qemu", "gemu");
         for (i = 0; i < maxlen; i++) {
-            gemu_virtual_memory_rw(cpu, guest_va + offset *  i, (uint8_t *) &buf[i], 1, 1);
+            gemu_virtual_memory_write(cpu, guest_va + offset *  i, (uint8_t *) &buf[i], 1);
             if (buf[i] == 0) {
                 break;
             }
@@ -241,7 +241,7 @@ uint32_t guest_wstrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong gu
     buf[0] = 0;
     unsigned i;
     for (i = 0; i < maxlen; i++) {
-        gemu_virtual_memory_rw(cpu, guest_va + 2 * i, (uint8_t *) &buf[i], 1, 0);
+        gemu_virtual_memory_read(cpu, guest_va + 2 * i, (uint8_t *) &buf[i], 1);
         if (buf[i] == 0) {
             break;
         }
@@ -255,7 +255,7 @@ uint32_t guest_astrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong gu
     buf[0] = 0;
     unsigned i;
     for (i = 0; i < maxlen; i++) {
-        gemu_virtual_memory_rw(cpu, guest_va + i, (uint8_t *) &buf[i], 1, 0);
+        gemu_virtual_memory_read(cpu, guest_va + i, (uint8_t *) &buf[i], 1);
         if (buf[i] == 0) {
             break;
         }
@@ -263,7 +263,7 @@ uint32_t guest_astrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong gu
     buf[maxlen - 1] = 0;
     over_write_qemu_substring(cpu, buf, i + 1, guest_va, true);
     for (i = 0; i < maxlen; i++) {
-        gemu_virtual_memory_rw(cpu, guest_va + i, (uint8_t *) &buf[i], 1, 0);
+        gemu_virtual_memory_read(cpu, guest_va + i, (uint8_t *) &buf[i], 1);
         if (buf[i] == 0) {
             break;
         }
