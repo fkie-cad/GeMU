@@ -21,6 +21,13 @@ struct Node {
         bool local_written_to;
         bool* shared_written_to;
     } written_to;
+    // For shared nodes: the full mapped range from ZwMapViewOfSection
+    hwaddr shared_map_start;
+    hwaddr shared_map_end;
+    // The other process's mapping (source process has all pages present)
+    hwaddr shared_other_start;
+    hwaddr shared_other_end;
+    unsigned long long int shared_other_pid;
     struct Node* prev;
     struct Node* next;
 };

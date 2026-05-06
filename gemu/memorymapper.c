@@ -39,6 +39,11 @@ struct Node* createNode(hwaddr start, hwaddr end) {
     newNode->end = end;
     newNode->is_shared = false;
     newNode->written_to.local_written_to = false;
+    newNode->shared_map_start = 0;
+    newNode->shared_map_end = 0;
+    newNode->shared_other_start = 0;
+    newNode->shared_other_end = 0;
+    newNode->shared_other_pid = 0;
     newNode->prev = NULL;
     newNode->next = NULL;
     return newNode;
@@ -87,6 +92,11 @@ void copyList(struct DoubleLinkedList* newList, struct DoubleLinkedList* list) {
         if (current->is_shared) {
             new_node->is_shared = true;
             new_node->written_to.shared_written_to = current->written_to.shared_written_to;
+            new_node->shared_map_start = current->shared_map_start;
+            new_node->shared_map_end = current->shared_map_end;
+            new_node->shared_other_start = current->shared_other_start;
+            new_node->shared_other_end = current->shared_other_end;
+            new_node->shared_other_pid = current->shared_other_pid;
         } else {
             new_node->is_shared = false;
             new_node->written_to.local_written_to = current->written_to.local_written_to;
@@ -120,6 +130,11 @@ void copy_written_to_flags(struct DoubleLinkedList* list, struct DoubleLinkedLis
                     if (current_written_to->is_shared) {
                         current_new_node->is_shared = true;
                         current_new_node->written_to.shared_written_to = current_written_to->written_to.shared_written_to;
+                        current_new_node->shared_map_start = current_written_to->shared_map_start;
+                        current_new_node->shared_map_end = current_written_to->shared_map_end;
+                        current_new_node->shared_other_start = current_written_to->shared_other_start;
+                        current_new_node->shared_other_end = current_written_to->shared_other_end;
+                        current_new_node->shared_other_pid = current_written_to->shared_other_pid;
                     } else {
                         current_new_node->is_shared = false;
                         current_new_node->written_to.local_written_to = true;
@@ -156,6 +171,28 @@ void reduceList(struct DoubleLinkedList* list) {
             // If either node was written to, we need to handle the merge carefully
             if (getWrittenToFlag(current) || getWrittenToFlag(current->next)) {
                 setWrittenFlag(current, true);
+            }
+            // Propagate shared map range (take the union)
+            if (current->next->is_shared && !current->is_shared) {
+                bool* writtenflag = (bool*) malloc(sizeof(bool));
+                *writtenflag = getWrittenToFlag(current);
+                current->is_shared = true;
+                current->written_to.shared_written_to = writtenflag;
+                current->shared_map_start = current->next->shared_map_start;
+                current->shared_map_end = current->next->shared_map_end;
+                current->shared_other_start = current->next->shared_other_start;
+                current->shared_other_end = current->next->shared_other_end;
+                current->shared_other_pid = current->next->shared_other_pid;
+            } else if (current->next->is_shared && current->is_shared) {
+                if (current->shared_map_start == 0 || current->next->shared_map_start < current->shared_map_start)
+                    current->shared_map_start = current->next->shared_map_start;
+                if (current->next->shared_map_end > current->shared_map_end)
+                    current->shared_map_end = current->next->shared_map_end;
+                if (current->shared_other_pid == 0) {
+                    current->shared_other_start = current->next->shared_other_start;
+                    current->shared_other_end = current->next->shared_other_end;
+                    current->shared_other_pid = current->next->shared_other_pid;
+                }
             }
 
             struct Node* temp = current->next;

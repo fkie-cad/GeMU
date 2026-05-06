@@ -71,7 +71,7 @@ def main():
     bb_re = re.compile(r"^B:(\d+):(\d+):0x([0-9a-fA-F]+),(\d+)$")
     base_re = re.compile(r"^Base: 0x([0-9a-fA-F]+), Size: 0x([0-9a-fA-F]+), File: (.*)$")
 
-    out = open(args.output, "w") if args.output else sys.stdout
+    out = open(args.runlog + "_annotated", "w")
 
     last_pid = None
     module_section_pid = None
