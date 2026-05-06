@@ -1612,7 +1612,18 @@ void helper_lcall_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
             }
 
             limit = get_seg_limit(e1, e2);
-            if (new_eip > limit) {
+            /*
+             * Heaven's Gate (WoW64): a 32-bit compat-mode LCALL into a 64-bit
+             * code segment (L-bit set, e.g. Windows selector 0x0033) while the
+             * CPU is in IA-32e long mode (HF_LMA_MASK).  Hardware does NOT
+             * enforce segment limit checks for 64-bit code segments, so Windows
+             * legitimately sets G=0/Limit=0 for them.  Applying the limit check
+             * here raises a spurious #GP that kills the process.  Skip it and
+             * let cpu_x86_load_seg_cache set HF_CS64_MASK via DESC_L_MASK.
+             * (Same fix as in helper_ljmp_protected above.)
+             */
+            if (new_eip > limit &&
+                (!(env->hflags & HF_LMA_MASK) || !(e2 & DESC_L_MASK))) {
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
             /* from this point, not restartable */
