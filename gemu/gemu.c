@@ -689,9 +689,9 @@ void free_list(ModuleNode* head) {
     }
 }
 
-void print_module_nodes(ModuleNode *head) {
+void print_module_nodes(ModuleNode *head, unsigned long long pid) {
     ModuleNode *current = head;
-    printf("printing modules that have been saved\n");
+    printf("printing modules that have been saved for pid %llu\n", pid);
     while (current != NULL) {
         printf("Base: 0x%llX, Size: 0x%llX, File: %s\n", current->base, current->size, current->file);
         current = current->next;

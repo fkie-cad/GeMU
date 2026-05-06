@@ -104,7 +104,7 @@ void to_lowercase(char *str);
 
 void free_list(ModuleNode *head);
 
-void print_module_nodes(ModuleNode *head);
+void print_module_nodes(ModuleNode *head, unsigned long long pid);
 
 Module *create_module(unsigned int base, unsigned int size, const char *path);
 

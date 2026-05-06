@@ -2,7 +2,9 @@ import datetime
 import json
 import os
 import shutil
+import socket
 import string
+import signal
 import subprocess
 import traceback
 from threading import Lock
@@ -70,30 +72,72 @@ class GemuInstance:
         self._gemu_path = Path(gemu_path)
         self.analysis_folder = analysis_folder
         self._process: subprocess.Popen|None = None
+        self._monitor_sock: socket.socket|None = None
+        self._socket_lock = Lock()
         self._lock = Lock()
         self._reason_for_gemu_end = "normal"
+
+    @property
+    def monitor_socket_path(self) -> Path:
+        return Path(f"/tmp/gemu_monitor_{os.getpid()}.sock")
 
     def _launch(self, parameters: str):
         self._try_to_free_image()
         cmd = f"{self._gemu_path} {parameters} > {self.analysis_folder.runlog}",
         print("Executing command:", cmd)
         self._process = subprocess.Popen(
-            cmd, stdin=subprocess.PIPE, shell=True, cwd=self.analysis_folder.analysis_folder,
+            cmd, shell=True, cwd=self.analysis_folder.analysis_folder,
+            preexec_fn=os.setsid,
         )
-        time.sleep(5)
+        self._connect_monitor()
+
+    def _connect_monitor(self):
+        """Connect to the QEMU monitor Unix socket, retrying until available."""
+        sock_path = str(self.monitor_socket_path)
+        for _ in range(10):
+            try:
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.connect(sock_path)
+                self._monitor_sock = s
+                # Read the initial HMP greeting
+                time.sleep(0.5)
+                s.recv(4096)
+                self._wait_vm_running()
+                return
+            except (ConnectionRefusedError, FileNotFoundError):
+                time.sleep(1)
+        raise RuntimeError(f"Could not connect to QEMU monitor at {sock_path}")
+
+    def _wait_vm_running(self):
+        """Poll monitor until VM status is 'running' (snapshot loaded)."""
+        for _ in range(30):
+            self._monitor_sock.sendall(b"info status\n")
+            time.sleep(1)
+            response = self._monitor_sock.recv(4096).decode()
+            if "running" in response:
+                print("VM is running.")
+                return
+        raise RuntimeError("VM did not reach 'running' state")
 
     def kill(self):
         if self._lock.acquire_lock(blocking=False): #only first kill will be executed and logged
             try:
-                self.write_to_qemu_console(b"system_powerdown\n")
-                self.write_to_qemu_console(b"quit\n")
-            except BrokenPipeError:
+                if self._monitor_sock:
+                    self.write_to_qemu_console(b"quit\n")
+            except (BrokenPipeError, OSError):
                 pass
+            if self._monitor_sock:
+                self._monitor_sock.close()
+                self._monitor_sock = None
+            self.monitor_socket_path.unlink(missing_ok=True)
             try:
-                self._process.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                pass
-            self._process.kill()
+                self._process.wait(timeout=3)
+            except (subprocess.TimeoutExpired, KeyboardInterrupt):
+                # Kill the entire process group (shell + QEMU child)
+                try:
+                    os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
 
     def log_return_status(self, decorator_state: dict):
         with open(self.analysis_folder.runlog, "a") as f:
@@ -140,15 +184,18 @@ class GemuInstance:
     def launch_gemu(self, params_string: str):
         try:
             self._launch(params_string)
-            yield True
-        except Exception as e:
+        except Exception:
             self._reason_for_gemu_end = f"error({traceback.format_exc()})"
+            self.kill()
+            raise
+        try:
+            yield True
         finally:
             self.kill()
 
     def write_to_qemu_console(self, command: bytes):
-        self._process.stdin.write(command)
-        self._process.stdin.flush()
+        with self._socket_lock:
+            self._monitor_sock.sendall(command)
 
     def wait(self, timeout: int|float|None):
         try:

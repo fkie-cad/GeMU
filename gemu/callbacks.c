@@ -334,6 +334,9 @@ void gemu_cb_sysret(CPUX86State *cpu)
     get_current_pid_and_tid(cpu_state, &pid, &tid, process);
     WinThread* current_thread = wi_current_thread(process, tid);
 
+    if (gemu_use_tracing) {
+        print_module_nodes(process->current_modules, process->ID);
+    }
     syscall_hook_t* return_hook = &current_thread->syscall_return_hook;
     if(return_hook->active == false){
         // sysret without hooked syscall
