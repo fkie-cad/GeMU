@@ -120,7 +120,7 @@ class GemuInstance:
         raise RuntimeError("VM did not reach 'running' state")
 
     def kill(self):
-        if self._lock.acquire_lock(blocking=False): #only first kill will be executed and logged
+        if self._lock.acquire(blocking=False): #only first kill will be executed and logged
             try:
                 if self._monitor_sock:
                     self.write_to_qemu_console(b"quit\n")
