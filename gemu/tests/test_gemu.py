@@ -139,7 +139,7 @@ def test_tracing_works(compiled_tests_folder):
     analysis_folder = unpack_single_file(
         sample=sample_path,
         config="win10",
-        time=10,
+        time=20,
         runname=f"gemutest-syscall",
         yararules=yararules,
         trackingmode="syscall",
