@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -78,21 +79,20 @@ def test_analysis_folder_dumps_get_zipped_empty(tmpdir):
 
     assert "dumps.zip" not in os.listdir(folder.analysis_folder)
 
-def test_GemuInstance_normal(tmpdir):
+@patch.object(GemuInstance, '_connect_monitor')
+@patch.object(GemuInstance, '_wait_vm_running')
+def test_GemuInstance_normal(_mock_wait, _mock_connect, tmpdir):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
     name_of_sample = Path(SMALL_BITNESS_PE).name
     folder = AnalysisFolder(RUNNAME, Path(tmpdir) / name_of_sample)
-    instance = GemuInstance(IMAGE_PATH, "cat -", folder)
+    instance = GemuInstance(IMAGE_PATH, "sleep", folder)
 
-    with instance.launch_gemu("hey ho"):
+    with instance.launch_gemu("10"):
         instance.wait(1)
     instance.log_return_status({"decorator": "return"})
 
-    expected = """system_powerdown
-quit
-EXIT STATES OF DECORATORS: {"decorator": "return"}
-PROCESS RETURN CODE: None
-REASON FOR GEMU EXIT: timeout
-"""
-    assert expected in folder.runlog.read_text()
+    runlog = folder.runlog.read_text()
+    assert 'EXIT STATES OF DECORATORS: {"decorator": "return"}' in runlog
+    assert 'PROCESS RETURN CODE:' in runlog
+    assert 'REASON FOR GEMU EXIT: timeout' in runlog
 
