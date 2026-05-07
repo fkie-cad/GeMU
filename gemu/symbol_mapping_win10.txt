@@ -189,5 +189,19 @@ C:\Windows\SysWOW64\msvcr120.dll;wcsrchr;73402;32
 C:\Windows\System32\ntdll.dll;RtlInitStringEx;940176;64
 C:\Windows\SysWOW64\ntdll.dll;RtlInitString;441024;32
 C:\Windows\SysWOW64\ntdll.dll;RtlInitStringEx;800304;32
+C:\Windows\System32\ntdll.dll;NtOpenKey;631232;64
+C:\Windows\System32\ntdll.dll;NtOpenKeyEx;639632;64
+C:\Windows\System32\ntdll.dll;NtOpenKeyTransacted;639664;64
+C:\Windows\System32\ntdll.dll;NtOpenKeyTransactedEx;639696;64
+C:\Windows\System32\ntdll.dll;NtQueryValueKey;631392;64
+C:\Windows\System32\ntdll.dll;RtlpNtOpenKey;511232;64
+C:\Windows\System32\ntdll.dll;RtlpNtQueryValueKey;508576;64
+C:\Windows\SysWOW64\ntdll.dll;NtOpenKey;431616;32
+C:\Windows\SysWOW64\ntdll.dll;NtOpenKeyEx;435856;32
+C:\Windows\SysWOW64\ntdll.dll;NtOpenKeyTransacted;435872;32
+C:\Windows\SysWOW64\ntdll.dll;NtOpenKeyTransactedEx;435888;32
+C:\Windows\SysWOW64\ntdll.dll;NtQueryValueKey;431696;32
+C:\Windows\SysWOW64\ntdll.dll;RtlpNtOpenKey;915456;32
+C:\Windows\SysWOW64\ntdll.dll;RtlpNtQueryValueKey;915504;32
 
 

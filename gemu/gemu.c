@@ -1,4 +1,5 @@
 #define USE_SYSCALL_NAMES
+#define USE_KEY_VALUE_INFORMATION_CLASS_NAMES
 #include "gemu/gemu.h"
 #include "gemu/calling_conventions.h"
 #include "gemu/parameter_types.h"
@@ -6,6 +7,7 @@
 #include "gemu/fastcheck.h"
 #include "gemu/memorymapper.h"
 #include "gemu/mappedwaitinglist.h"
+#include "gemu/base64.h"
 #include "glib.h"
 #include "gemu/apidoc.h"
 #include "gemu/hooks.h"
@@ -313,6 +315,131 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 }
 
 
+static void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, size_t dst_length) {
+    for (size_t i = 0; i < dst_length-1; i++) {
+        memcpy(dst+i, ((unsigned char *)src)+(2*i), 1);
+    }
+    dst[dst_length-1] = '\0';
+}
+
+static void extract_registry_data_by_kind(KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length) {
+    unsigned char buf[(data_length >> 1)];
+    switch (kind) {
+        case RegValueString:
+        case RegValueExpandString:
+            copy_wide_to_normal_string(buf, data, (data_length >> 1) + 2);
+            cJSON_AddStringToObject(output, "Data", (char *) buf);
+            break;
+
+        case RegValueDword: {
+            DWORD extracted_dword = *((DWORD*) data);
+            cJSON_AddNumberToObject(output, "Data", extracted_dword);
+            break;
+        }
+
+        case RegValueMultiString: {
+            copy_wide_to_normal_string(buf, data, (data_length >> 1) + 2);
+            cJSON *json_array = cJSON_CreateArray();
+            unsigned char *current_string = buf;
+            for (size_t i = 1; i < sizeof(buf); i++) {
+                if (buf[i] == '\0') {
+                    if (buf[i-1] == '\0')
+                        break;
+                    cJSON_AddItemToArray(json_array, cJSON_CreateString((const char*)current_string));
+                    current_string = &buf[i+1];
+                }
+            }
+            cJSON_AddItemToObject(output, "Data", json_array);
+            break;
+        }
+
+        case RegValueBinary: {
+            size_t output_length;
+            unsigned char *base64_string = base64_encode((const unsigned char *)data, data_length, &output_length);
+            if ((int64_t) output_length > 0)
+                cJSON_AddStringToObject(output, "Data", (char *) base64_string);
+            free(base64_string);
+            break;
+        }
+
+        default:
+            printf("Key Value Kind not implemented yet:  %s\n", KEY_VALUE_INFORMATION_KIND_NAMES[kind]);
+            break;
+    }
+}
+
+static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
+                        const char *dll_name, const char *func_name, cJSON *output, bool is32Bit) {
+
+    CUSTOM_ULONG ResultLength, ResultLengthPointer;
+    ResultLength.QuadPart = 0;
+    ResultLengthPointer.QuadPart = 0;
+    KEY_VALUE_INFORMATION_CLASS value_information_class;
+    if (is32Bit) {
+        ResultLengthPointer.Parts.Low = cJSON_GetObjectItemCaseSensitive(output, "ResultLength")->valueint;
+        gemu_virtual_memory_rw(cpu, ResultLengthPointer.Parts.Low, (uint8_t*) (&(ResultLength.Parts.Low)), sizeof(ResultLength.Parts.Low), false);
+    } else {
+        ResultLengthPointer.QuadPart = cJSON_GetObjectItemCaseSensitive(output, "ResultLength")->valueint;
+        gemu_virtual_memory_rw(cpu, ResultLengthPointer.Parts.Low, (uint8_t*) &ResultLength.Parts.Low, sizeof(ResultLength.Parts.Low), false);
+    }
+
+    value_information_class = cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformationClass")->valueint;
+    PVOID_64 value = (PVOID_64) cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformation")->valueint;
+
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "KeyValueInformationClass", KEY_VALUE_INFORMATION_CLASS_NAMES[value_information_class]);
+
+    unsigned char name_buf[(ResultLength.QuadPart >> 1)];
+
+    KEY_VALUE_INFORMATION_KIND type;
+    unsigned char *complete_struct = malloc(ResultLength.QuadPart);
+    gemu_virtual_memory_rw(cpu, value, (uint8_t*) complete_struct, ResultLength.QuadPart, false);
+
+    switch (value_information_class) {
+        case KeyValueFullInformation: {
+            PKEY_VALUE_FULL_INFORMATION_32 kv_full_info = (PKEY_VALUE_FULL_INFORMATION_32) complete_struct;
+            type = (KEY_VALUE_INFORMATION_KIND) kv_full_info->Type;
+
+            cJSON_AddNumberToObject(result, "TitleIndex", kv_full_info->TitleIndex);
+            cJSON_AddStringToObject(result, "Type", KEY_VALUE_INFORMATION_KIND_NAMES[type]);
+            cJSON_AddNumberToObject(result, "DataLength", kv_full_info->DataLength);
+            cJSON_AddNumberToObject(result, "NameLength", kv_full_info->NameLength);
+
+            if (kv_full_info->NameLength > 0) {
+                copy_wide_to_normal_string(name_buf, (unsigned char *) &kv_full_info->Data, (kv_full_info->NameLength >> 1) + 1);
+                cJSON_AddStringToObject(result, "Name", (char *) name_buf);
+            } else {
+                cJSON_AddStringToObject(result, "Name", "");
+            }
+
+            extract_registry_data_by_kind(type, complete_struct + kv_full_info->DataOffset, result, kv_full_info->DataLength);
+            break;
+        }
+        case KeyValuePartialInformation: {
+            PKEY_VALUE_PARTIAL_INFORMATION_32 kv_partial_info = (PKEY_VALUE_PARTIAL_INFORMATION_32) complete_struct;
+            type = (KEY_VALUE_INFORMATION_KIND) kv_partial_info->Type;
+
+            cJSON_AddNumberToObject(result, "TitleIndex", kv_partial_info->TitleIndex);
+            cJSON_AddStringToObject(result, "Type", KEY_VALUE_INFORMATION_KIND_NAMES[type]);
+            cJSON_AddNumberToObject(result, "DataLength", kv_partial_info->DataLength);
+
+            extract_registry_data_by_kind(type, &(kv_partial_info->Data), result, kv_partial_info->DataLength);
+            break;
+        }
+        default:
+            printf("KeyValueInformationClass NOT YET IMPLEMENTED!\n");
+            break;
+    }
+
+    free(complete_struct);
+
+    char *result_string = cJSON_PrintUnformatted(result);
+    printf("&NtQueryValueKey: %s\n", result_string);
+    cJSON_free(result_string);
+    cJSON_Delete(result);
+}
+
+
 static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
                                       TranslationBlock *tb, hook_t *hook, WinProcess *process) {
     target_ulong ret = get_return_value(cpu, hook->cc);
@@ -359,6 +486,9 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         }
         if (strcmp(func_name, "ZwDuplicateObject") == 0) {
             handle_ZwDuplicateObject_exit(output, process, 0);
+        }
+        if (strcmp(func_name, "NtQueryValueKey") == 0 && ret == 0) {
+            handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output, cc_is32bit(hook->cc));
         }
     }
 

@@ -15,6 +15,7 @@ gemu_ss.add(files(
   './win_spector.c',
   './xxhash64.c',
   './dotnet_spector.c',
+  './base64.c',
   './cpuid_filter.c'
   ))
 
