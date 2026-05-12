@@ -322,12 +322,13 @@ static void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, s
     dst[dst_length-1] = '\0';
 }
 
-static void extract_registry_data_by_kind(KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length) {
+static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length, target_ulong guest_va) {
     unsigned char buf[(data_length >> 1)];
     switch (kind) {
         case RegValueString:
         case RegValueExpandString:
             copy_wide_to_normal_string(buf, data, (data_length >> 1) + 2);
+            over_write_qemu_substring(cpu, (char *) buf, data_length, guest_va, false);
             cJSON_AddStringToObject(output, "Data", (char *) buf);
             break;
 
@@ -339,6 +340,7 @@ static void extract_registry_data_by_kind(KEY_VALUE_INFORMATION_KIND kind, unsig
 
         case RegValueMultiString: {
             copy_wide_to_normal_string(buf, data, (data_length >> 1) + 2);
+            over_write_qemu_substring(cpu, (char *) buf, data_length, guest_va, false);
             cJSON *json_array = cJSON_CreateArray();
             unsigned char *current_string = buf;
             for (size_t i = 1; i < sizeof(buf); i++) {
@@ -407,12 +409,15 @@ static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProces
 
             if (kv_full_info->NameLength > 0) {
                 copy_wide_to_normal_string(name_buf, (unsigned char *) &kv_full_info->Data, (kv_full_info->NameLength >> 1) + 1);
+                target_ulong name_va = value + offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
+                over_write_qemu_substring(cpu, (char *) name_buf, kv_full_info->NameLength, name_va, false);
                 cJSON_AddStringToObject(result, "Name", (char *) name_buf);
             } else {
                 cJSON_AddStringToObject(result, "Name", "");
             }
 
-            extract_registry_data_by_kind(type, complete_struct + kv_full_info->DataOffset, result, kv_full_info->DataLength);
+            target_ulong data_va = value + kv_full_info->DataOffset;
+            extract_registry_data_by_kind(cpu, type, complete_struct + kv_full_info->DataOffset, result, kv_full_info->DataLength, data_va);
             break;
         }
         case KeyValuePartialInformation: {
@@ -423,7 +428,8 @@ static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProces
             cJSON_AddStringToObject(result, "Type", KEY_VALUE_INFORMATION_KIND_NAMES[type]);
             cJSON_AddNumberToObject(result, "DataLength", kv_partial_info->DataLength);
 
-            extract_registry_data_by_kind(type, &(kv_partial_info->Data), result, kv_partial_info->DataLength);
+            target_ulong data_va = value + offsetof(KEY_VALUE_PARTIAL_INFORMATION_32, Data);
+            extract_registry_data_by_kind(cpu, type, &(kv_partial_info->Data), result, kv_partial_info->DataLength, data_va);
             break;
         }
         default:

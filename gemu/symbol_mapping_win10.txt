@@ -203,5 +203,12 @@ C:\Windows\SysWOW64\ntdll.dll;NtOpenKeyTransactedEx;435888;32
 C:\Windows\SysWOW64\ntdll.dll;NtQueryValueKey;431696;32
 C:\Windows\SysWOW64\ntdll.dll;RtlpNtOpenKey;915456;32
 C:\Windows\SysWOW64\ntdll.dll;RtlpNtQueryValueKey;915504;32
-
+C:\Windows\System32\ntdll.dll;NtQueryKey;631360;64
+C:\Windows\System32\ntdll.dll;ZwQueryKey;631360;64
+C:\Windows\System32\ntdll.dll;NtQueryValueKey;631392;64
+C:\Windows\System32\ntdll.dll;ZwQueryValueKey;631392;64
+C:\Windows\SysWOW64\ntdll.dll;NtQueryKey;431680;32
+C:\Windows\SysWOW64\ntdll.dll;ZwQueryKey;431680;32
+C:\Windows\SysWOW64\ntdll.dll;NtQueryValueKey;431696;32
+C:\Windows\SysWOW64\ntdll.dll;ZwQueryValueKey;431696;32
 
