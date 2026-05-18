@@ -94,8 +94,8 @@ void dispatch_type_handler(CPUState *cpu, const FunctionParameter *param,
 
 // --- built-in handlers ---
 
-static const char *PSTR[] = {"Windows.Win32.Foundation.PSTR", "LPCWSTR", NULL};
-static const char *PWSTR[] = {"Windows.Win32.Foundation.PWSTR", "LPCSTR", NULL};
+static const char *PSTR[] = {"Windows.Win32.Foundation.PSTR", "LPCSTR", "LPSTR", NULL};
+static const char *PWSTR[] = {"Windows.Win32.Foundation.PWSTR", "LPCWSTR", "LPWSTR", NULL};
 static const char *PROCESS_INFORMATION_PARAS[] = {
     "Windows.Win32.System.Threading.PROCESS_INFORMATION*",
     "LPPROCESS_INFORMATION", NULL};
