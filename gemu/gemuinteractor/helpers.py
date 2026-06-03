@@ -200,10 +200,10 @@ class GemuInstance:
     def wait(self, timeout: int|float|None):
         try:
             print(
-                f"{datetime.datetime.now()} sleeping for {timeout}"
+                f"{datetime.datetime.now()} recording for up to {timeout}s"
             )
             self._process.wait(timeout)
-            print("sleep over.. shutting down")
+            print("QEMU terminated. sleep over.. shutting down")
         except subprocess.TimeoutExpired:
             print("timeout expired.. shutting down")
             self._reason_for_gemu_end = "timeout"
