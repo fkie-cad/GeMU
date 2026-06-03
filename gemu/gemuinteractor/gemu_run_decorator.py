@@ -19,12 +19,18 @@ class RunDecorator:
         self.return_code: str = ""
 
     def _run(self):
-        while True:
+        try:
+            while True:
+                self._decorate()
+                time.sleep(self._sleep)
+                if self._stop_decorator:
+                    break
             self._decorate()
-            time.sleep(self._sleep)
-            if self._stop_decorator:
-                break
-        self._decorate()
+        except BrokenPipeError:
+            # QEMU monitor socket was closed underneath us during shutdown
+            # (kill() races with this thread). Stop decorating.
+            print(f"{type(self).__name__}: monitor socket closed during shutdown, stopping decorator")
+            self._stop_decorator = True
 
     def stop(self):
         self._stop_decorator = True
