@@ -87,6 +87,9 @@ class GemuInstance:
         print("Executing command:", cmd)
         self._process = subprocess.Popen(
             cmd, shell=True, cwd=self.analysis_folder.analysis_folder,
+            # Setsid: Run the shell in a new session/process group so kill() can
+            # killpg the whole group (shell + QEMU child) instead of only the
+            # shell wrapper, which would leave QEMU orphaned.
             preexec_fn=os.setsid,
         )
         self._connect_monitor()
