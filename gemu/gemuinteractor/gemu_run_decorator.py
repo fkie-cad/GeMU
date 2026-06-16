@@ -144,9 +144,7 @@ class MouseMover(RunDecorator):
         self._t = 0.0
         self._sent_x = 0
         self._sent_y = 0
-        self._amplitude_x = random.uniform(150, 250)
-        self._amplitude_y = random.uniform(100, 200)
-        self._speed = random.uniform(0.08, 0.12)
+        self._randomize_loop() # select initial loop parameters from same distribution
         self._taskmgr_delay = taskmgr_delay
         self._taskmgr_sent = False
         self._elapsed = 0.0
