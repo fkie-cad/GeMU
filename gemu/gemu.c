@@ -14,7 +14,6 @@
 #include "gemu/win_spector.h"
 #include "gemu/dotnet_spector.h"
 #include "syscalltable.c"
-#include "target/i386/cpu.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
