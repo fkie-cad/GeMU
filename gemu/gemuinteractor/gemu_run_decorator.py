@@ -141,43 +141,50 @@ class MouseMover(RunDecorator):
 
     def __init__(self, sleep: float, gemu_instance: GemuInstance, taskmgr_delay: float = 10.0):
         super().__init__(sleep, gemu_instance)
-        self._t = 0.0
-        self._sent_x = 0
-        self._sent_y = 0
+        self._loop_progress = 0.0  # in whole figure-eight loops
+        self._current_x = 0 # relative to start position
+        self._current_y = 0
         self._randomize_loop() # select initial loop parameters from same distribution
         self._taskmgr_delay = taskmgr_delay
         self._taskmgr_sent = False
-        self._elapsed = 0.0
+        self._taskmgr_start = None
 
     def _randomize_loop(self):
         """Pick new random parameters for the next figure-eight loop."""
         self._amplitude_x = random.uniform(150, 250)
         self._amplitude_y = random.uniform(100, 200)
-        self._speed = random.uniform(0.08, 0.12)
+        self._loop_speed = random.uniform(0.08, 0.12) / (2 * math.pi)  # loops per tick
 
     def _decorate(self):
         if self._gemu_instance._monitor_sock is None:
             return
+        self._move_mouse()
+        self._maybe_open_taskmgr()
 
-        # Randomize shape each full loop (t crosses a 2*pi boundary)
-        old_loop = int(self._t / (2 * math.pi))
-        self._t += self._speed
-        new_loop = int(self._t / (2 * math.pi))
-        if new_loop > old_loop:
+    def _move_mouse(self):
+        # Randomize shape each full loop (loop_progress crosses an integer)
+        old_loop = int(self._loop_progress)
+        self._loop_progress += self._loop_speed
+        if int(self._loop_progress) > old_loop:
             self._randomize_loop()
 
-        # Figure-eight (lemniscate): x = Ax*sin(t), y = Ay*sin(t)*cos(t)
-        target_x = int(self._amplitude_x * math.sin(self._t))
-        target_y = int(self._amplitude_y * math.sin(self._t) * math.cos(self._t))
-        dx = target_x - self._sent_x
-        dy = target_y - self._sent_y
-        self._sent_x = target_x
-        self._sent_y = target_y
+        # Figure-eight (lemniscate): x = Ax*sin(p), y = Ay*sin(p)*cos(p)
+        phase = 2 * math.pi * self._loop_progress
+        target_x = int(self._amplitude_x * math.sin(phase))
+        target_y = int(self._amplitude_y * math.sin(phase) * math.cos(phase))
+        dx = target_x - self._current_x
+        dy = target_y - self._current_y
+        self._current_x = target_x
+        self._current_y = target_y
 
-        if dx != 0 or dy != 0:
+        if (dx, dy) != (0, 0):
             self._gemu_instance.write_to_qemu_console(f"mouse_move {dx} {dy}\n".encode())
 
-        self._elapsed += self._sleep
-        if not self._taskmgr_sent and self._elapsed >= self._taskmgr_delay:
+    def _maybe_open_taskmgr(self):
+        if self._taskmgr_sent:
+            return
+        if self._taskmgr_start is None:
+            self._taskmgr_start = time.monotonic()
+        if time.monotonic() - self._taskmgr_start >= self._taskmgr_delay:
             self._gemu_instance.write_to_qemu_console(b"sendkey ctrl-shift-esc\n")
             self._taskmgr_sent = True
