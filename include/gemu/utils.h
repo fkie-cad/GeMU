@@ -39,6 +39,15 @@ static inline int gemu_virtual_memory_write(CPUState *env, target_ulong addr,
     return gemu_virtual_memory_rw(env, addr, (uint8_t *)buf, len, true);
 }
 
+// Reads from a different process's address space by temporarily swapping the
+// page-table base (cr[3]/ASID), then restoring it. Safe because the read path
+// does its own page walk from cr[3] rather than trusting the TLB. The swap is
+// restored unconditionally, so callers can't leak the borrowed address space.
+// Defined in utils.c (not inline here) because it dereferences the target
+// CPU state, which is only complete in per-target translation units.
+int gemu_virtual_memory_read_in_asid(CPUState *env, target_ulong asid,
+                                     target_ulong addr, uint8_t *buf, int len);
+
 // Reads UNICODE string from guest memory via virtual address to buffer
 // Returns number of characters read
 uint32_t guest_wstrncpy(CPUState *cpu, char *buf, size_t maxlen,

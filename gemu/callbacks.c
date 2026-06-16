@@ -211,7 +211,6 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
             WinProcess *source_proc = get_WinProcess_for_pid(
                 gemu_inst->win_spec, section->shared_other_pid);
             if (source_proc != NULL) {
-                target_ulong original_cr3 = cpu->env_ptr->cr[3];
                 target_ulong source_cr3 = source_proc->ASID;
                 hwaddr other_start = section->shared_other_start;
                 uint64_t other_length = section->shared_other_end - section->shared_other_start;
@@ -221,7 +220,6 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
                        section->shared_other_pid, source_cr3,
                        other_start, other_start + other_length);
 
-                cpu->env_ptr->cr[3] = source_cr3;
                 for (uint64_t offset = 0; offset < length; offset += TARGET_PAGE_SIZE) {
                     uint64_t remaining = length - offset;
                     uint64_t chunk = remaining < TARGET_PAGE_SIZE ? remaining : TARGET_PAGE_SIZE;
@@ -235,11 +233,11 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
                     }
 
                     if (is_zero && offset < other_length) {
-                        gemu_virtual_memory_read(cpu, other_start + offset,
-                                                 buf + offset, chunk);
+                        gemu_virtual_memory_read_in_asid(cpu, source_cr3,
+                                                         other_start + offset,
+                                                         buf + offset, chunk);
                     }
                 }
-                cpu->env_ptr->cr[3] = original_cr3;
             }
         }
 

@@ -183,6 +183,19 @@ int gemu_virtual_memory_rw(CPUState *env, target_ulong addr,
     return 0;
 }
 
+// Reads from a different process's address space by temporarily swapping the
+// page-table base (cr[3]/ASID), then restoring it. Safe because the read path
+// does its own page walk from cr[3] rather than trusting the TLB. The swap is
+// restored unconditionally, so callers can't leak the borrowed address space.
+int gemu_virtual_memory_read_in_asid(CPUState *env, target_ulong asid,
+                                     target_ulong addr, uint8_t *buf, int len) {
+    target_ulong saved = env->env_ptr->cr[3];
+    env->env_ptr->cr[3] = asid;
+    int ret = gemu_virtual_memory_read(env, addr, buf, len);
+    env->env_ptr->cr[3] = saved;
+    return ret;
+}
+
 static const char *strings_to_replace[] = {
     "qemu",
     "vbox",
