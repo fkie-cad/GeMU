@@ -220,6 +220,13 @@ static void random_alpha_string(char *out, size_t len) {
     last_len = len;
 }
 
+void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, size_t dst_length) {
+    for (size_t i = 0; i < dst_length-1; i++) {
+        dst[i] = src[2*i];
+    }
+    dst[dst_length-1] = '\0';
+}
+
 void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va, bool is_ansi){
     int offset = is_ansi ? 1 : 2;
     unsigned i;

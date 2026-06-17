@@ -310,13 +310,6 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 }
 
 
-static void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, size_t dst_length) {
-    for (size_t i = 0; i < dst_length-1; i++) {
-        memcpy(dst+i, ((unsigned char *)src)+(2*i), 1);
-    }
-    dst[dst_length-1] = '\0';
-}
-
 static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length, target_ulong guest_va) {
     unsigned char buf[(data_length >> 1)];
     switch (kind) {

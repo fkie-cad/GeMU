@@ -58,6 +58,11 @@ uint32_t guest_astrncpy(CPUState *cpu, char *buf, size_t maxlen,
 
 bool in_kernel_mode(const CPUState *cpu);
 
+// Narrows a UTF-16LE buffer into a NUL-terminated narrow string by keeping the
+// low byte of each code unit. dst_length is the full size of dst including the
+// terminator, so the caller must size dst accordingly.
+void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, size_t dst_length);
+
 void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va, bool is_ansi);
 
 bool gemu_dump_buffer_to_file(const uint8_t *buf, size_t length, const char *filename);
