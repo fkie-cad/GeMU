@@ -310,15 +310,31 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 }
 
 
+// Upper bound for guest-controlled registry value/struct sizes. Lengths read
+// from guest memory are clamped to this to avoid unbounded allocations driven
+// by a malicious guest.
+#define REGISTRY_VALUE_MAX_LENGTH (1u << 20) // 1 MiB
+
 static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length, target_ulong guest_va) {
-    unsigned char buf[(data_length >> 1)];
+    // data is data_length bytes of UTF-16LE; clamp the guest-controlled length,
+    // then size for one byte per code unit plus a NUL terminator. Allocate on
+    // the heap rather than the stack so a large (or malicious) length can't
+    // exhaust the stack.
+    if (data_length > REGISTRY_VALUE_MAX_LENGTH)
+        data_length = REGISTRY_VALUE_MAX_LENGTH;
+    size_t buf_len = (data_length >> 1) + 1;
     switch (kind) {
         case RegValueString:
-        case RegValueExpandString:
-            copy_wide_to_normal_string(buf, data, (data_length >> 1) + 2);
+        case RegValueExpandString: {
+            unsigned char *buf = malloc(buf_len);
+            if (buf == NULL)
+                break;
+            copy_wide_to_normal_string(buf, data, buf_len);
             over_write_qemu_substring(cpu, (char *) buf, data_length, guest_va, false);
             cJSON_AddStringToObject(output, "Data", (char *) buf);
+            free(buf);
             break;
+        }
 
         case RegValueDword: {
             DWORD extracted_dword = *((DWORD*) data);
@@ -327,11 +343,14 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
         }
 
         case RegValueMultiString: {
-            copy_wide_to_normal_string(buf, data, (data_length >> 1) + 2);
+            unsigned char *buf = malloc(buf_len);
+            if (buf == NULL)
+                break;
+            copy_wide_to_normal_string(buf, data, buf_len);
             over_write_qemu_substring(cpu, (char *) buf, data_length, guest_va, false);
             cJSON *json_array = cJSON_CreateArray();
             unsigned char *current_string = buf;
-            for (size_t i = 1; i < sizeof(buf); i++) {
+            for (size_t i = 1; i < buf_len; i++) {
                 if (buf[i] == '\0') {
                     if (buf[i-1] == '\0')
                         break;
@@ -340,6 +359,7 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
                 }
             }
             cJSON_AddItemToObject(output, "Data", json_array);
+            free(buf);
             break;
         }
 
@@ -379,10 +399,17 @@ static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProces
     cJSON *result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "KeyValueInformationClass", KEY_VALUE_INFORMATION_CLASS_NAMES[value_information_class]);
 
-    unsigned char name_buf[(ResultLength.QuadPart >> 1)];
+    // ResultLength is guest-controlled; clamp it so the read/allocation below
+    // can't be driven to an arbitrary size by the guest.
+    if (ResultLength.QuadPart > REGISTRY_VALUE_MAX_LENGTH)
+        ResultLength.QuadPart = REGISTRY_VALUE_MAX_LENGTH;
 
     KEY_VALUE_INFORMATION_KIND type;
     unsigned char *complete_struct = malloc(ResultLength.QuadPart);
+    if (complete_struct == NULL) {
+        cJSON_Delete(result);
+        return;
+    }
     gemu_virtual_memory_rw(cpu, value, (uint8_t*) complete_struct, ResultLength.QuadPart, false);
 
     switch (value_information_class) {
@@ -396,10 +423,18 @@ static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProces
             cJSON_AddNumberToObject(result, "NameLength", kv_full_info->NameLength);
 
             if (kv_full_info->NameLength > 0) {
-                copy_wide_to_normal_string(name_buf, (unsigned char *) &kv_full_info->Data, (kv_full_info->NameLength >> 1) + 1);
-                target_ulong name_va = value + offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
-                over_write_qemu_substring(cpu, (char *) name_buf, kv_full_info->NameLength, name_va, false);
-                cJSON_AddStringToObject(result, "Name", (char *) name_buf);
+                size_t name_length = kv_full_info->NameLength;
+                if (name_length > REGISTRY_VALUE_MAX_LENGTH)
+                    name_length = REGISTRY_VALUE_MAX_LENGTH;
+                size_t name_buf_len = (name_length >> 1) + 1;
+                unsigned char *name_buf = malloc(name_buf_len);
+                if (name_buf != NULL) {
+                    copy_wide_to_normal_string(name_buf, (unsigned char *) &kv_full_info->Data, name_buf_len);
+                    target_ulong name_va = value + offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
+                    over_write_qemu_substring(cpu, (char *) name_buf, name_length, name_va, false);
+                    cJSON_AddStringToObject(result, "Name", (char *) name_buf);
+                    free(name_buf);
+                }
             } else {
                 cJSON_AddStringToObject(result, "Name", "");
             }
