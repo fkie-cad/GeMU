@@ -137,45 +137,41 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
 
 void handle_ZwDuplicateObject_exit(cJSON *output, WinProcess *process,
                                    int source_process_handle) {
-    cJSON *source_item = cJSON_GetObjectItemCaseSensitive(output, "SourceHandle");
-    cJSON *target_item = cJSON_GetObjectItemCaseSensitive(output, "TargetHandle");
-    if (!source_item || !target_item) {
-        return;
-    }
-    double source_handle_raw = source_item->valuedouble;
-    double target_handle_raw = target_item->valuedouble;
-    if (target_handle_raw <= 0 || target_handle_raw > INT_MAX) {
-        return;
+    uint64_t source_handle_raw =
+        cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "SourceHandle"));
+    uint64_t target_handle_raw =
+        cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "TargetHandle"));
+    if (target_handle_raw == 0 || target_handle_raw > INT_MAX) {
+        return; // Invalid target, return
     }
     int target_handle = (int)target_handle_raw;
 
-    // When SourceHandle is NtCurrentProcess (0xFFFFFFFF), the caller is asking
-    // for a handle to the process that SourceProcessHandle refers to.
-    if (source_handle_raw > INT_MAX || source_handle_raw < 0) {
-        if (source_process_handle > 0 &&
-            g_hash_table_contains(process->process_handles,
-                                  GINT_TO_POINTER(source_process_handle))) {
-            int pid = GPOINTER_TO_INT(g_hash_table_lookup(
-                process->process_handles, GINT_TO_POINTER(source_process_handle)));
-            printf("ZwDuplicateObject: pseudo-handle -> target_handle=%d maps to PID %d\n",
-                   target_handle, pid);
-            g_hash_table_insert(process->process_handles,
-                                GINT_TO_POINTER(target_handle), GINT_TO_POINTER(pid));
-        }
+    // The handle we resolve the PID from is normally SourceHandle. When
+    // SourceHandle is NtCurrentProcess (the (HANDLE)-1 pseudo-handle), the
+    // caller is asking for a handle to the process that SourceProcessHandle
+    // refers to, so we look that one up instead. Match both the 64-bit and
+    // 32-bit guest representations of -1.
+    int lookup_handle;
+    const char *kind;
+    if (source_handle_raw == (uint64_t)-1 || source_handle_raw == 0xFFFFFFFF) { // pseudo handle, use current process
+        lookup_handle = source_process_handle;
+        kind = "pseudo-handle -> ";
+    } else {
+        lookup_handle = (int)source_handle_raw; // use given non-pseudo handle
+        kind = "";
+    }
+    if (lookup_handle <= 0 ||
+        !g_hash_table_contains(process->process_handles,
+                               GINT_TO_POINTER(lookup_handle))) {
         return;
     }
 
-    int source_handle = (int)source_handle_raw;
-    if (source_handle <= 0) {
-        return;
-    }
-    if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(source_handle))) {
-        int pid = GPOINTER_TO_INT(g_hash_table_lookup(process->process_handles,
-                                                       GINT_TO_POINTER(source_handle)));
-        printf("ZwDuplicateObject: target_handle=%d maps to PID %d\n", target_handle, pid);
-        g_hash_table_insert(process->process_handles,
-                            GINT_TO_POINTER(target_handle), GINT_TO_POINTER(pid));
-    }
+    int pid = GPOINTER_TO_INT(g_hash_table_lookup(
+        process->process_handles, GINT_TO_POINTER(lookup_handle)));
+    printf("ZwDuplicateObject: %starget_handle=%d maps to PID %d\n",
+           kind, target_handle, pid);
+    g_hash_table_insert(process->process_handles, GINT_TO_POINTER(target_handle),
+                        GINT_TO_POINTER(pid));
 }
 
 
