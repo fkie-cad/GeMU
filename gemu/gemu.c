@@ -27,6 +27,9 @@ extern bool gemu_compile_syscall_helper;
 static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
                                        TranslationBlock *tb, hook_t *hook, WinProcess *process);
 
+static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
+                        const char *dll_name, const char *func_name, cJSON *output);
+
 
 
 #define IdxInLineDLLName 0
@@ -300,6 +303,11 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
         case NtDuplicateObject:
             handle_ZwDuplicateObject_exit(output, process,
                                           hook->cached_source_process_handle);
+            break;
+
+        case NtQueryValueKey:
+            if (ret == 0)
+                handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output);
             break;
 
         default:
@@ -744,6 +752,10 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
     if (strcmp(func_name, "ZwDuplicateObject") == 0) {
         return true;
     }
+    if (strcmp(func_name, "NtQueryValueKey") == 0) {
+        // handled at exit in pipe_logger_after_tb_exec; nothing to do on entry
+        return true;
+    }
     return false;
 }
 
@@ -804,6 +816,9 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
             return true;
         case NtAlpcSendWaitReceivePort:
             handle_NtAlpcSendWaitReceivePort_entry(cpu);
+            return true;
+        case NtQueryValueKey:
+            // handled at exit in pipe_logger_after_syscall_exec; nothing to do on entry
             return true;
         default:
             return false;
