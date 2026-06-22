@@ -763,6 +763,7 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
 
 // WIP: patches a NULL timeout on NtAlpcSendWaitReceivePort to 100ms to prevent
 // an infinite block when the target ALPC service is not running.
+// TODO: Implement for Basic Block tracking mode?
 static void handle_NtAlpcSendWaitReceivePort_entry(CPUState *cpu) {
     QWORD timeout_ptr = get_parameter(cpu, 7, CC_SYSCALL_64);
     if (timeout_ptr != 0) {
