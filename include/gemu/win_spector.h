@@ -37,14 +37,6 @@ typedef struct _OBJECT_ATTRIBUTES {
 typedef QWORD ULONG_64, PVOID_64;
 typedef DWORD ULONG_32;
 
-typedef union {
-    struct _CUSTOM_ULONG {
-        ULONG_32 Low;
-        ULONG_32 High;
-    } Parts;
-    ULONG_64 QuadPart;
-} CUSTOM_ULONG, *PCUSTOM_ULONG;
-
 typedef enum _KEY_VALUE_INFORMATION_CLASS
 {
     KeyValueBasicInformation,

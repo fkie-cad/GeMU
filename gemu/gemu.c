@@ -315,6 +315,20 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
 // by a malicious guest.
 #define REGISTRY_VALUE_MAX_LENGTH (1u << 20) // 1 MiB
 
+// Bounds-safe lookups: kind/class come from guest-controlled data, so an
+// out-of-range value must not index past the name tables.
+static const char *key_value_kind_name(KEY_VALUE_INFORMATION_KIND kind) {
+    if ((size_t) kind >= sizeof(KEY_VALUE_INFORMATION_KIND_NAMES) / sizeof(KEY_VALUE_INFORMATION_KIND_NAMES[0]))
+        return "REG_VALUE_INVALID";
+    return KEY_VALUE_INFORMATION_KIND_NAMES[kind];
+}
+
+static const char *key_value_class_name(KEY_VALUE_INFORMATION_CLASS cls) {
+    if ((size_t) cls >= sizeof(KEY_VALUE_INFORMATION_CLASS_NAMES) / sizeof(KEY_VALUE_INFORMATION_CLASS_NAMES[0]))
+        return "InvalidKeyValueInfoClass";
+    return KEY_VALUE_INFORMATION_CLASS_NAMES[cls];
+}
+
 static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length, target_ulong guest_va) {
     // data is data_length bytes of UTF-16LE; clamp the guest-controlled length,
     // then size for one byte per code unit plus a NUL terminator. Allocate on
@@ -337,6 +351,8 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
         }
 
         case RegValueDword: {
+            if (data_length < sizeof(DWORD))
+                break;
             DWORD extracted_dword = *((DWORD*) data);
             cJSON_AddNumberToObject(output, "Data", extracted_dword);
             break;
@@ -373,59 +389,67 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
         }
 
         default:
-            printf("Key Value Kind not implemented yet:  %s\n", KEY_VALUE_INFORMATION_KIND_NAMES[kind]);
+            printf("Key Value Kind not implemented yet:  %s\n", key_value_kind_name(kind));
             break;
     }
 }
 
 static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
-                        const char *dll_name, const char *func_name, cJSON *output, bool is32Bit) {
+                        const char *dll_name, const char *func_name, cJSON *output) {
 
-    CUSTOM_ULONG ResultLength, ResultLengthPointer;
-    ResultLength.QuadPart = 0;
-    ResultLengthPointer.QuadPart = 0;
-    KEY_VALUE_INFORMATION_CLASS value_information_class;
-    if (is32Bit) {
-        ResultLengthPointer.Parts.Low = cJSON_GetObjectItemCaseSensitive(output, "ResultLength")->valueint;
-        gemu_virtual_memory_rw(cpu, ResultLengthPointer.Parts.Low, (uint8_t*) (&(ResultLength.Parts.Low)), sizeof(ResultLength.Parts.Low), false);
-    } else {
-        ResultLengthPointer.QuadPart = cJSON_GetObjectItemCaseSensitive(output, "ResultLength")->valueint;
-        gemu_virtual_memory_rw(cpu, ResultLengthPointer.Parts.Low, (uint8_t*) &ResultLength.Parts.Low, sizeof(ResultLength.Parts.Low), false);
-    }
+    // NtQueryValueKey's ResultLength out-param is a PULONG (always 32-bit
+    // regardless of guest bitness); read the actual length the kernel wrote
+    // back through that pointer.
+    target_ulong result_length_ptr = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ResultLength"));
+    uint32_t reported_length = 0;
+    gemu_virtual_memory_read(cpu, result_length_ptr, (uint8_t*) &reported_length, sizeof(reported_length));
 
-    value_information_class = cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformationClass")->valueint;
-    PVOID_64 value = (PVOID_64) cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformation")->valueint;
+    cJSON *class_item = cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformationClass");
+    if (class_item == NULL)
+        return;
+    KEY_VALUE_INFORMATION_CLASS value_information_class = class_item->valueint;
+    PVOID_64 value = (PVOID_64) cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformation"));
 
     cJSON *result = cJSON_CreateObject();
-    cJSON_AddStringToObject(result, "KeyValueInformationClass", KEY_VALUE_INFORMATION_CLASS_NAMES[value_information_class]);
+    cJSON_AddStringToObject(result, "KeyValueInformationClass", key_value_class_name(value_information_class));
 
-    // ResultLength is guest-controlled; clamp it so the read/allocation below
-    // can't be driven to an arbitrary size by the guest.
-    if (ResultLength.QuadPart > REGISTRY_VALUE_MAX_LENGTH)
-        ResultLength.QuadPart = REGISTRY_VALUE_MAX_LENGTH;
+    // result_length is guest-controlled; clamp it so the read/allocation below
+    // can't be driven to an arbitrary size by the guest. complete_struct is
+    // exactly result_length bytes, so every guest-supplied offset/length read
+    // from it must be validated against result_length to avoid heap over-reads.
+    size_t result_length = reported_length;
+    if (result_length > REGISTRY_VALUE_MAX_LENGTH)
+        result_length = REGISTRY_VALUE_MAX_LENGTH;
 
     KEY_VALUE_INFORMATION_KIND type;
-    unsigned char *complete_struct = malloc(ResultLength.QuadPart);
+    unsigned char *complete_struct = malloc(result_length);
     if (complete_struct == NULL) {
         cJSON_Delete(result);
         return;
     }
-    gemu_virtual_memory_rw(cpu, value, (uint8_t*) complete_struct, ResultLength.QuadPart, false);
+    gemu_virtual_memory_read(cpu, value, (uint8_t*) complete_struct, result_length);
 
     switch (value_information_class) {
         case KeyValueFullInformation: {
+            // Need at least the fixed header to read the length/offset fields.
+            size_t header = offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
+            if (result_length < header)
+                break;
+
             PKEY_VALUE_FULL_INFORMATION_32 kv_full_info = (PKEY_VALUE_FULL_INFORMATION_32) complete_struct;
             type = (KEY_VALUE_INFORMATION_KIND) kv_full_info->Type;
 
             cJSON_AddNumberToObject(result, "TitleIndex", kv_full_info->TitleIndex);
-            cJSON_AddStringToObject(result, "Type", KEY_VALUE_INFORMATION_KIND_NAMES[type]);
+            cJSON_AddStringToObject(result, "Type", key_value_kind_name(type));
             cJSON_AddNumberToObject(result, "DataLength", kv_full_info->DataLength);
             cJSON_AddNumberToObject(result, "NameLength", kv_full_info->NameLength);
 
             if (kv_full_info->NameLength > 0) {
+                // The name sits right after the header; clamp its length to the
+                // bytes actually present in complete_struct.
                 size_t name_length = kv_full_info->NameLength;
-                if (name_length > REGISTRY_VALUE_MAX_LENGTH)
-                    name_length = REGISTRY_VALUE_MAX_LENGTH;
+                if (name_length > result_length - header)
+                    name_length = result_length - header;
                 size_t name_buf_len = (name_length >> 1) + 1;
                 unsigned char *name_buf = malloc(name_buf_len);
                 if (name_buf != NULL) {
@@ -439,20 +463,35 @@ static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProces
                 cJSON_AddStringToObject(result, "Name", "");
             }
 
-            target_ulong data_va = value + kv_full_info->DataOffset;
-            extract_registry_data_by_kind(cpu, type, complete_struct + kv_full_info->DataOffset, result, kv_full_info->DataLength, data_va);
+            // DataOffset/DataLength are guest-controlled; only descend if the
+            // described region lies within complete_struct.
+            if (kv_full_info->DataOffset <= result_length) {
+                size_t data_length = kv_full_info->DataLength;
+                if (data_length > result_length - kv_full_info->DataOffset)
+                    data_length = result_length - kv_full_info->DataOffset;
+                target_ulong data_va = value + kv_full_info->DataOffset;
+                extract_registry_data_by_kind(cpu, type, complete_struct + kv_full_info->DataOffset, result, data_length, data_va);
+            }
             break;
         }
         case KeyValuePartialInformation: {
+            size_t header = offsetof(KEY_VALUE_PARTIAL_INFORMATION_32, Data);
+            if (result_length < header)
+                break;
+
             PKEY_VALUE_PARTIAL_INFORMATION_32 kv_partial_info = (PKEY_VALUE_PARTIAL_INFORMATION_32) complete_struct;
             type = (KEY_VALUE_INFORMATION_KIND) kv_partial_info->Type;
 
             cJSON_AddNumberToObject(result, "TitleIndex", kv_partial_info->TitleIndex);
-            cJSON_AddStringToObject(result, "Type", KEY_VALUE_INFORMATION_KIND_NAMES[type]);
+            cJSON_AddStringToObject(result, "Type", key_value_kind_name(type));
             cJSON_AddNumberToObject(result, "DataLength", kv_partial_info->DataLength);
 
+            // Data follows the header; clamp its length to what's present.
+            size_t data_length = kv_partial_info->DataLength;
+            if (data_length > result_length - header)
+                data_length = result_length - header;
             target_ulong data_va = value + offsetof(KEY_VALUE_PARTIAL_INFORMATION_32, Data);
-            extract_registry_data_by_kind(cpu, type, &(kv_partial_info->Data), result, kv_partial_info->DataLength, data_va);
+            extract_registry_data_by_kind(cpu, type, &(kv_partial_info->Data), result, data_length, data_va);
             break;
         }
         default:
@@ -517,7 +556,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
             handle_ZwDuplicateObject_exit(output, process, 0);
         }
         if (strcmp(func_name, "NtQueryValueKey") == 0 && ret == 0) {
-            handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output, cc_is32bit(hook->cc));
+            handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output);
         }
     }
 
