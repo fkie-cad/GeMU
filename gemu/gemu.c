@@ -561,7 +561,9 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
             handle_ZwMapViewOfSection_exit(gemu, process, output);
         }
         if (strcmp(func_name, "ZwDuplicateObject") == 0) {
-            handle_ZwDuplicateObject_exit(output, process, 0);
+            int source_process_handle = (int)cJSON_GetUint64Value(
+                cJSON_GetObjectItemCaseSensitive(output, "SourceProcessHandle"));
+            handle_ZwDuplicateObject_exit(output, process, source_process_handle);
         }
         if (strcmp(func_name, "NtQueryValueKey") == 0 && ret == 0) {
             handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output);
