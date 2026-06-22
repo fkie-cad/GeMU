@@ -138,8 +138,9 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
 }
 
 
-void handle_ZwDuplicateObject_exit(cJSON *output, WinProcess *process,
-                                   int source_process_handle) {
+void handle_ZwDuplicateObject_exit(cJSON *output, WinProcess *process) {
+    int source_process_handle = (int)cJSON_GetUint64Value(
+        cJSON_GetObjectItemCaseSensitive(output, "SourceProcessHandle"));
     uint64_t source_handle_raw =
         cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "SourceHandle"));
     uint64_t target_handle_raw =
@@ -301,8 +302,7 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
             break;
 
         case NtDuplicateObject:
-            handle_ZwDuplicateObject_exit(output, process,
-                                          hook->cached_source_process_handle);
+            handle_ZwDuplicateObject_exit(output, process);
             break;
 
         case NtQueryValueKey:
@@ -561,9 +561,7 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
             handle_ZwMapViewOfSection_exit(gemu, process, output);
         }
         if (strcmp(func_name, "ZwDuplicateObject") == 0) {
-            int source_process_handle = (int)cJSON_GetUint64Value(
-                cJSON_GetObjectItemCaseSensitive(output, "SourceProcessHandle"));
-            handle_ZwDuplicateObject_exit(output, process, source_process_handle);
+            handle_ZwDuplicateObject_exit(output, process);
         }
         if (strcmp(func_name, "NtQueryValueKey") == 0 && ret == 0) {
             handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output);
@@ -815,7 +813,8 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
                               &hook->out_parameter_list, cc);
             return true;
         case NtDuplicateObject:
-            hook->cached_source_process_handle = (int)get_parameter(cpu, 0, cc);
+            // SourceProcessHandle is captured via the generic in_parameters
+            // mechanism and read from the merged output at exit
             return true;
         case NtAlpcSendWaitReceivePort:
             handle_NtAlpcSendWaitReceivePort_entry(cpu);

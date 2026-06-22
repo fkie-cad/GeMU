@@ -162,8 +162,6 @@ typedef struct
     bool active;
     // char func_name[256];
     syscall_t syscall_enum;
-    // For NtDuplicateObject: stash SourceProcessHandle from entry for use at exit
-    int cached_source_process_handle;
 } syscall_hook_t;
 typedef struct
 {
