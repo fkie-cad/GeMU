@@ -4,7 +4,7 @@ import threading
 import time
 from itertools import product
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Any
 
 from _pytest.compat import LEGACY_PATH
 import pytest
@@ -80,7 +80,7 @@ SHELLCODE_TEST_NAMES = (
 
 @pytest.mark.emulation
 @pytest.mark.parametrize("test_name,bitness,trackingmode", product(SHELLCODE_TEST_NAMES, (32,64), ("syscall", "basicblock")))
-def test_shellcode_payload(compiled_tests_folder: Any, test_name: product[tuple[Literal['injection', 'ntmapviewofsection_injection', 'ntduplicateobject_injection', 'owninjection', 'owninjectionmemcpy', 'writeprocessmemory', 'writefile'], Literal[32, 64], Literal['syscall', 'basicblock']]], bitness: product[tuple[Literal['injection', 'ntmapviewofsection_injection', 'ntduplicateobject_injection', 'owninjection', 'owninjectionmemcpy', 'writeprocessmemory', 'writefile'], Literal[32, 64], Literal['syscall', 'basicblock']]], trackingmode: product[tuple[Literal['injection', 'ntmapviewofsection_injection', 'ntduplicateobject_injection', 'owninjection', 'owninjectionmemcpy', 'writeprocessmemory', 'writefile'], Literal[32, 64], Literal['syscall', 'basicblock']]]):
+def test_shellcode_payload(compiled_tests_folder: Any, test_name: str, bitness: Literal[32, 64], trackingmode: Literal['syscall', 'basicblock']):
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
     yararules = (TEST_FOLDER/"shellcode.yarc")
 
