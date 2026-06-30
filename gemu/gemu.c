@@ -344,7 +344,7 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
     // exhaust the stack.
     if (data_length > REGISTRY_VALUE_MAX_LENGTH)
         data_length = REGISTRY_VALUE_MAX_LENGTH;
-    size_t buf_len = (data_length >> 1) + 1;
+    size_t buf_len = data_length/2 + 1;
     switch (kind) {
         case RegValueString:
         case RegValueExpandString: {
@@ -352,7 +352,7 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
             if (buf == NULL)
                 break;
             copy_wide_to_normal_string(buf, data, buf_len);
-            over_write_qemu_substring(cpu, (char *) buf, data_length, guest_va, false);
+            over_write_qemu_substring(cpu, (char *) buf, buf_len, guest_va, false);
             cJSON_AddStringToObject(output, "Data", (char *) buf);
             free(buf);
             break;
@@ -371,7 +371,7 @@ static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_K
             if (buf == NULL)
                 break;
             copy_wide_to_normal_string(buf, data, buf_len);
-            over_write_qemu_substring(cpu, (char *) buf, data_length, guest_va, false);
+            over_write_qemu_substring(cpu, (char *) buf, buf_len, guest_va, false);
             cJSON *json_array = cJSON_CreateArray();
             unsigned char *current_string = buf;
             for (size_t i = 1; i < buf_len; i++) {
@@ -458,12 +458,12 @@ static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProces
                 size_t name_length = kv_full_info->NameLength;
                 if (name_length > result_length - header)
                     name_length = result_length - header;
-                size_t name_buf_len = (name_length >> 1) + 1;
+                size_t name_buf_len = name_length/2  + 1;
                 unsigned char *name_buf = malloc(name_buf_len);
                 if (name_buf != NULL) {
                     copy_wide_to_normal_string(name_buf, (unsigned char *) &kv_full_info->Data, name_buf_len);
                     target_ulong name_va = value + offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
-                    over_write_qemu_substring(cpu, (char *) name_buf, name_length, name_va, false);
+                    over_write_qemu_substring(cpu, (char *) name_buf, name_buf_len, name_va, false);
                     cJSON_AddStringToObject(result, "Name", (char *) name_buf);
                     free(name_buf);
                 }

@@ -202,6 +202,9 @@ static const char *strings_to_replace[] = {
     NULL,
 };
 
+
+// collision prevention: result != last result. earlier results may be repeated
+// result will have `len` characters -> requires buffer of size `len+1`
 static void random_alpha_string(char *out, size_t len) {
     static const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     static char last[64];
@@ -227,6 +230,10 @@ void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, size_t d
     dst[dst_length-1] = '\0';
 }
 
+// guest_va: address to overwrite string at
+// buf: contents of guest_address as ansi string
+// maxlen: in symbols not byte, including null terminator
+// is ansi -> only relevant for guest_va for writing back
 void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va, bool is_ansi){
     int offset = is_ansi ? 1 : 2;
     unsigned i;
@@ -260,6 +267,7 @@ void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_u
     }
 }
 
+// maxlen: maximum size of corresponding ansi string buffer in bytes including terminator
 uint32_t guest_wstrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va) {
     buf[0] = 0;
     unsigned i;
@@ -270,10 +278,12 @@ uint32_t guest_wstrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong gu
         }
     }
     buf[maxlen - 1] = 0;
-    over_write_qemu_substring(cpu, buf, (i + 1) * 2, guest_va, false);
+    // i+1 <= maxlen
+    over_write_qemu_substring(cpu, buf, i + 1, guest_va, false);
     return i;
 }
 
+// maxlen: maximum size of buffer in bytes including terminator
 uint32_t guest_astrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va) {
     buf[0] = 0;
     unsigned i;
