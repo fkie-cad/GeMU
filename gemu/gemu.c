@@ -1,4 +1,5 @@
 #define USE_SYSCALL_NAMES
+#define USE_KEY_VALUE_INFORMATION_CLASS_NAMES
 #include "gemu/gemu.h"
 #include "gemu/calling_conventions.h"
 #include "gemu/parameter_types.h"
@@ -6,6 +7,7 @@
 #include "gemu/fastcheck.h"
 #include "gemu/memorymapper.h"
 #include "gemu/mappedwaitinglist.h"
+#include "gemu/base64.h"
 #include "glib.h"
 #include "gemu/apidoc.h"
 #include "gemu/hooks.h"
@@ -24,6 +26,9 @@ extern bool gemu_compile_syscall_helper;
 
 static void pipe_logger_before_tb_exec(target_ulong pc, CPUState *cpu,
                                        TranslationBlock *tb, hook_t *hook, WinProcess *process);
+
+static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
+                        const char *dll_name, const char *func_name, cJSON *output);
 
 
 
@@ -133,6 +138,47 @@ void handle_ZwOpenProcess_Exit(cJSON *output, WinProcess *process) {
 }
 
 
+void handle_ZwDuplicateObject_exit(cJSON *output, WinProcess *process) {
+    int source_process_handle = (int)cJSON_GetUint64Value(
+        cJSON_GetObjectItemCaseSensitive(output, "SourceProcessHandle"));
+    uint64_t source_handle_raw =
+        cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "SourceHandle"));
+    uint64_t target_handle_raw =
+        cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "TargetHandle"));
+    if (target_handle_raw == 0 || target_handle_raw > INT_MAX) {
+        return; // Invalid target, return
+    }
+    int target_handle = (int)target_handle_raw;
+
+    // The handle we resolve the PID from is normally SourceHandle. When
+    // SourceHandle is NtCurrentProcess (the (HANDLE)-1 pseudo-handle), the
+    // caller is asking for a handle to the process that SourceProcessHandle
+    // refers to, so we look that one up instead. Match both the 64-bit and
+    // 32-bit guest representations of -1.
+    int lookup_handle;
+    const char *kind;
+    if (source_handle_raw == (uint64_t)-1 || source_handle_raw == 0xFFFFFFFF) { // pseudo handle, use current process
+        lookup_handle = source_process_handle;
+        kind = "pseudo-handle -> ";
+    } else {
+        lookup_handle = (int)source_handle_raw; // use given non-pseudo handle
+        kind = "";
+    }
+    if (lookup_handle <= 0 ||
+        !g_hash_table_contains(process->process_handles,
+                               GINT_TO_POINTER(lookup_handle))) {
+        return;
+    }
+
+    int pid = GPOINTER_TO_INT(g_hash_table_lookup(
+        process->process_handles, GINT_TO_POINTER(lookup_handle)));
+    printf("ZwDuplicateObject: %starget_handle=%d maps to PID %d\n",
+           kind, target_handle, pid);
+    g_hash_table_insert(process->process_handles, GINT_TO_POINTER(target_handle),
+                        GINT_TO_POINTER(pid));
+}
+
+
 void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJSON* output) {
     // printf("I am in ZwMapViewOfSection\n");
     if (!cJSON_GetObjectItemCaseSensitive(output, "SectionHandle")) {
@@ -145,7 +191,8 @@ void handle_ZwMapViewOfSection_exit(Gemu *gemu_instance, WinProcess *process, cJ
     target_ulong pid = process->ID;
     if (g_hash_table_contains(process->process_handles, GINT_TO_POINTER(handle))) {
         pid = (target_ulong) g_hash_table_lookup(process->process_handles, GINT_TO_POINTER(handle));
-        // printf("ZwMapViewOfSection injection into PID %li\n", pid);
+        printf("ZwMapViewOfSection injection into PID %li\n", pid);
+        g_hash_table_insert(gemu_instance->pids_to_lookout_for, GINT_TO_POINTER(pid), NULL);
         struct MappedRange* rangeptr = g_hash_table_lookup(process->section_handles, GINT_TO_POINTER(sectionHandle));
         if (rangeptr == NULL) {
             // printf("could not find the correct range for the handle therefore a shared state is not possible\n");
@@ -253,12 +300,219 @@ void pipe_logger_after_syscall_exec(CPUState *cpu, WinProcess* process, syscall_
         case NtCreateUserProcess:
             handle_NtCreateUserProcess_exit(gemu, process, output, cpu);
             break;
-    
+
+        case NtDuplicateObject:
+            handle_ZwDuplicateObject_exit(output, process);
+            break;
+
+        case NtQueryValueKey:
+            if (ret == 0)
+                handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output);
+            break;
+
         default:
             break;
     }
 
     cJSON_Delete(output);
+}
+
+
+// Upper bound for guest-controlled registry value/struct sizes. Lengths read
+// from guest memory are clamped to this to avoid unbounded allocations driven
+// by a malicious guest.
+#define REGISTRY_VALUE_MAX_LENGTH (1u << 20) // 1 MiB
+
+// Bounds-safe lookups: kind/class come from guest-controlled data, so an
+// out-of-range value must not index past the name tables.
+static const char *key_value_kind_name(KEY_VALUE_INFORMATION_KIND kind) {
+    if ((size_t) kind >= sizeof(KEY_VALUE_INFORMATION_KIND_NAMES) / sizeof(KEY_VALUE_INFORMATION_KIND_NAMES[0]))
+        return "REG_VALUE_INVALID";
+    return KEY_VALUE_INFORMATION_KIND_NAMES[kind];
+}
+
+static const char *key_value_class_name(KEY_VALUE_INFORMATION_CLASS cls) {
+    if ((size_t) cls >= sizeof(KEY_VALUE_INFORMATION_CLASS_NAMES) / sizeof(KEY_VALUE_INFORMATION_CLASS_NAMES[0]))
+        return "InvalidKeyValueInfoClass";
+    return KEY_VALUE_INFORMATION_CLASS_NAMES[cls];
+}
+
+static void extract_registry_data_by_kind(CPUState *cpu, KEY_VALUE_INFORMATION_KIND kind, unsigned char *data, cJSON *output, size_t data_length, target_ulong guest_va) {
+    // data is data_length bytes of UTF-16LE; clamp the guest-controlled length,
+    // then size for one byte per code unit plus a NUL terminator. Allocate on
+    // the heap rather than the stack so a large (or malicious) length can't
+    // exhaust the stack.
+    if (data_length > REGISTRY_VALUE_MAX_LENGTH)
+        data_length = REGISTRY_VALUE_MAX_LENGTH;
+    size_t buf_len = data_length/2 + 1;
+    switch (kind) {
+        case RegValueString:
+        case RegValueExpandString: {
+            unsigned char *buf = malloc(buf_len);
+            if (buf == NULL)
+                break;
+            copy_wide_to_normal_string(buf, data, buf_len);
+            over_write_qemu_substring(cpu, (char *) buf, buf_len, guest_va, false);
+            cJSON_AddStringToObject(output, "Data", (char *) buf);
+            free(buf);
+            break;
+        }
+
+        case RegValueDword: {
+            if (data_length < sizeof(DWORD))
+                break;
+            DWORD extracted_dword = *((DWORD*) data);
+            cJSON_AddNumberToObject(output, "Data", extracted_dword);
+            break;
+        }
+
+        case RegValueMultiString: {
+            unsigned char *buf = malloc(buf_len);
+            if (buf == NULL)
+                break;
+            copy_wide_to_normal_string(buf, data, buf_len);
+            over_write_qemu_substring(cpu, (char *) buf, buf_len, guest_va, false);
+            cJSON *json_array = cJSON_CreateArray();
+            unsigned char *current_string = buf;
+            for (size_t i = 1; i < buf_len; i++) {
+                if (buf[i] == '\0') {
+                    if (buf[i-1] == '\0')
+                        break;
+                    cJSON_AddItemToArray(json_array, cJSON_CreateString((const char*)current_string));
+                    current_string = &buf[i+1];
+                }
+            }
+            cJSON_AddItemToObject(output, "Data", json_array);
+            free(buf);
+            break;
+        }
+
+        case RegValueBinary: {
+            size_t output_length;
+            unsigned char *base64_string = base64_encode((const unsigned char *)data, data_length, &output_length);
+            if ((int64_t) output_length > 0)
+                cJSON_AddStringToObject(output, "Data", (char *) base64_string);
+            free(base64_string);
+            break;
+        }
+
+        default:
+            printf("Key Value Kind not implemented yet:  %s\n", key_value_kind_name(kind));
+            break;
+    }
+}
+
+static void handle_NtQueryValueKey(Gemu *gemu_instance, CPUState *cpu, WinProcess *process,
+                        const char *dll_name, const char *func_name, cJSON *output) {
+
+    // NtQueryValueKey's ResultLength out-param is a PULONG (always 32-bit
+    // regardless of guest bitness); read the actual length the kernel wrote
+    // back through that pointer.
+    target_ulong result_length_ptr = cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "ResultLength"));
+    uint32_t reported_length = 0;
+    gemu_virtual_memory_read(cpu, result_length_ptr, (uint8_t*) &reported_length, sizeof(reported_length));
+
+    cJSON *class_item = cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformationClass");
+    if (class_item == NULL)
+        return;
+    KEY_VALUE_INFORMATION_CLASS value_information_class = class_item->valueint;
+    PVOID_64 value = (PVOID_64) cJSON_GetUint64Value(cJSON_GetObjectItemCaseSensitive(output, "KeyValueInformation"));
+
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "KeyValueInformationClass", key_value_class_name(value_information_class));
+
+    // result_length is guest-controlled; clamp it so the read/allocation below
+    // can't be driven to an arbitrary size by the guest. complete_struct is
+    // exactly result_length bytes, so every guest-supplied offset/length read
+    // from it must be validated against result_length to avoid heap over-reads.
+    size_t result_length = reported_length;
+    if (result_length > REGISTRY_VALUE_MAX_LENGTH)
+        result_length = REGISTRY_VALUE_MAX_LENGTH;
+
+    KEY_VALUE_INFORMATION_KIND type;
+    unsigned char *complete_struct = malloc(result_length);
+    if (complete_struct == NULL) {
+        cJSON_Delete(result);
+        return;
+    }
+    gemu_virtual_memory_read(cpu, value, (uint8_t*) complete_struct, result_length);
+
+    switch (value_information_class) {
+        case KeyValueFullInformation: {
+            // Need at least the fixed header to read the length/offset fields.
+            size_t header = offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
+            if (result_length < header)
+                break;
+
+            PKEY_VALUE_FULL_INFORMATION_32 kv_full_info = (PKEY_VALUE_FULL_INFORMATION_32) complete_struct;
+            type = (KEY_VALUE_INFORMATION_KIND) kv_full_info->Type;
+
+            cJSON_AddNumberToObject(result, "TitleIndex", kv_full_info->TitleIndex);
+            cJSON_AddStringToObject(result, "Type", key_value_kind_name(type));
+            cJSON_AddNumberToObject(result, "DataLength", kv_full_info->DataLength);
+            cJSON_AddNumberToObject(result, "NameLength", kv_full_info->NameLength);
+
+            if (kv_full_info->NameLength > 0) {
+                // The name sits right after the header; clamp its length to the
+                // bytes actually present in complete_struct.
+                size_t name_length = kv_full_info->NameLength;
+                if (name_length > result_length - header)
+                    name_length = result_length - header;
+                size_t name_buf_len = name_length/2  + 1;
+                unsigned char *name_buf = malloc(name_buf_len);
+                if (name_buf != NULL) {
+                    copy_wide_to_normal_string(name_buf, (unsigned char *) &kv_full_info->Data, name_buf_len);
+                    target_ulong name_va = value + offsetof(KEY_VALUE_FULL_INFORMATION_32, Data);
+                    over_write_qemu_substring(cpu, (char *) name_buf, name_buf_len, name_va, false);
+                    cJSON_AddStringToObject(result, "Name", (char *) name_buf);
+                    free(name_buf);
+                }
+            } else {
+                cJSON_AddStringToObject(result, "Name", "");
+            }
+
+            // DataOffset/DataLength are guest-controlled; only descend if the
+            // described region lies within complete_struct.
+            if (kv_full_info->DataOffset <= result_length) {
+                size_t data_length = kv_full_info->DataLength;
+                if (data_length > result_length - kv_full_info->DataOffset)
+                    data_length = result_length - kv_full_info->DataOffset;
+                target_ulong data_va = value + kv_full_info->DataOffset;
+                extract_registry_data_by_kind(cpu, type, complete_struct + kv_full_info->DataOffset, result, data_length, data_va);
+            }
+            break;
+        }
+        case KeyValuePartialInformation: {
+            size_t header = offsetof(KEY_VALUE_PARTIAL_INFORMATION_32, Data);
+            if (result_length < header)
+                break;
+
+            PKEY_VALUE_PARTIAL_INFORMATION_32 kv_partial_info = (PKEY_VALUE_PARTIAL_INFORMATION_32) complete_struct;
+            type = (KEY_VALUE_INFORMATION_KIND) kv_partial_info->Type;
+
+            cJSON_AddNumberToObject(result, "TitleIndex", kv_partial_info->TitleIndex);
+            cJSON_AddStringToObject(result, "Type", key_value_kind_name(type));
+            cJSON_AddNumberToObject(result, "DataLength", kv_partial_info->DataLength);
+
+            // Data follows the header; clamp its length to what's present.
+            size_t data_length = kv_partial_info->DataLength;
+            if (data_length > result_length - header)
+                data_length = result_length - header;
+            target_ulong data_va = value + offsetof(KEY_VALUE_PARTIAL_INFORMATION_32, Data);
+            extract_registry_data_by_kind(cpu, type, &(kv_partial_info->Data), result, data_length, data_va);
+            break;
+        }
+        default:
+            printf("KeyValueInformationClass NOT YET IMPLEMENTED!\n");
+            break;
+    }
+
+    free(complete_struct);
+
+    char *result_string = cJSON_PrintUnformatted(result);
+    printf("&NtQueryValueKey: %s\n", result_string);
+    cJSON_free(result_string);
+    cJSON_Delete(result);
 }
 
 
@@ -305,6 +559,12 @@ static void pipe_logger_after_tb_exec(target_ulong pc, CPUState *cpu,
         }
         if (strcmp(func_name, "ZwMapViewOfSection") == 0) {
             handle_ZwMapViewOfSection_exit(gemu, process, output);
+        }
+        if (strcmp(func_name, "ZwDuplicateObject") == 0) {
+            handle_ZwDuplicateObject_exit(output, process);
+        }
+        if (strcmp(func_name, "NtQueryValueKey") == 0 && ret == 0) {
+            handle_NtQueryValueKey(gemu, cpu, process, dll_name, func_name, output);
         }
     }
 
@@ -489,7 +749,30 @@ bool handle_special_apis(Gemu *gemu_instance, CPUState *cpu, const char *dll_nam
         // printf("handling a special API %s for ZwMapViewOfSection\n", func_name);
         return true;
     }
+    if (strcmp(func_name, "ZwDuplicateObject") == 0) {
+        return true;
+    }
+    if (strcmp(func_name, "NtQueryValueKey") == 0) {
+        // handled at exit in pipe_logger_after_tb_exec; nothing to do on entry
+        return true;
+    }
     return false;
+}
+
+// WIP: patches a NULL timeout on NtAlpcSendWaitReceivePort to 100ms to prevent
+// an infinite block when the target ALPC service is not running.
+// TODO: Implement for Basic Block tracking mode?
+static void handle_NtAlpcSendWaitReceivePort_entry(CPUState *cpu) {
+    QWORD timeout_ptr = get_parameter(cpu, 7, CC_SYSCALL_64);
+    if (timeout_ptr != 0) {
+        return;
+    }
+    INT64 timeout_value = -1000000; // 100ms relative timeout in 100ns units
+    target_ulong rsp = cpu->env_ptr->regs[R_ESP];
+    target_ulong timeout_addr = rsp - 16;
+    gemu_virtual_memory_write(cpu, timeout_addr, (uint8_t *)&timeout_value, 8);
+    gemu_virtual_memory_write(cpu, rsp + (8 + 7 * 8), (uint8_t *)&timeout_addr, 8);
+    printf("NtAlpcSendWaitReceivePort: patched NULL timeout to 100ms\n");
 }
 
 static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu, const char *dll_name,
@@ -528,6 +811,16 @@ static bool handle_special_syscall_apis_enum(Gemu *gemu_instance, CPUState *cpu,
             // printf("handling a special API %s for NtOpenFile\n", func_name);
             handle_NtOpenFile(gemu_instance, cpu, process, dll_name, func_name,
                               &hook->out_parameter_list, cc);
+            return true;
+        case NtDuplicateObject:
+            // SourceProcessHandle is captured via the generic in_parameters
+            // mechanism and read from the merged output at exit
+            return true;
+        case NtAlpcSendWaitReceivePort:
+            handle_NtAlpcSendWaitReceivePort_entry(cpu);
+            return true;
+        case NtQueryValueKey:
+            // handled at exit in pipe_logger_after_syscall_exec; nothing to do on entry
             return true;
         default:
             return false;
@@ -689,9 +982,9 @@ void free_list(ModuleNode* head) {
     }
 }
 
-void print_module_nodes(ModuleNode *head) {
+void print_module_nodes(ModuleNode *head, unsigned long long pid) {
     ModuleNode *current = head;
-    printf("printing modules that have been saved\n");
+    printf("printing modules that have been saved for pid %llu\n", pid);
     while (current != NULL) {
         printf("Base: 0x%llX, Size: 0x%llX, File: %s\n", current->base, current->size, current->file);
         current = current->next;

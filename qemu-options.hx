@@ -5661,6 +5661,15 @@ SRST
     It causes GeMU to print a line per each executed basic block in the infected processes.
 ERST
 
+DEF("gemuhidehypervisor", 0, QEMU_OPTION_gemuhidehypervisor, \
+"-gemuhidehypervisor    Hide the hypervisor presence from CPUID.\n", QEMU_ARCH_ALL)
+SRST
+``-gemuhidehypervisor``
+    Hide the hypervisor presence from CPUID.
+    Clears the hypervisor bit (leaf 1 ECX bit 31) and zeroes hypervisor
+    info leaves (0x40000000-0x400000FF) to prevent VM detection.
+ERST
+
 HXCOMM This is the last statement. Insert new options before this line!
 
 #undef DEF

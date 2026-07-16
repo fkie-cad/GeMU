@@ -23,6 +23,7 @@
 #include "exec/helper-proto.h"
 #include "exec/exec-all.h"
 #include "helper-tcg.h"
+#include "gemu/cpuid_filter.h"
 
 /*
  * NOTE: the translator must set DisasContext.cc_op to CC_OP_EFLAGS
@@ -55,6 +56,7 @@ void helper_cpuid(CPUX86State *env)
 
     cpu_x86_cpuid(env, (uint32_t)env->regs[R_EAX], (uint32_t)env->regs[R_ECX],
                   &eax, &ebx, &ecx, &edx);
+    gemu_filter_cpuid((uint32_t)env->regs[R_EAX], &eax, &ebx, &ecx, &edx);
     env->regs[R_EAX] = eax;
     env->regs[R_EBX] = ebx;
     env->regs[R_ECX] = ecx;

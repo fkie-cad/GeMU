@@ -238,7 +238,7 @@ WinProcess *wi_extract_process_from_memory(WindowsIntrospecter *w, CPUState *cpu
   // Read ImagePathName
   char *imagePathName = malloc(processParameters.ImagePathName.u.Length + 1);
   // TODO: Lifetime of imagePathName needs to be free-ed
-  guest_wstrncpy(cpu, imagePathName, processParameters.ImagePathName.u.Length,
+  guest_wstrncpy(cpu, imagePathName, processParameters.ImagePathName.u.Length+1,
                  processParameters.ImagePathName.Buffer);
 
   struct DoubleLinkedList *new_sections =

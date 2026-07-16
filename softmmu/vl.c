@@ -200,6 +200,7 @@ extern char dotnet_mode_str[256];
 extern char syscalltable[256];
 extern bool gemu_use_codecarver;
 extern bool gemu_use_tracing;
+extern bool gemu_hide_hypervisor;
 
 static struct {
     const char *driver;
@@ -3262,6 +3263,9 @@ void qemu_init(int argc, char **argv)
                 break;
             case QEMU_OPTION_gemutracing:
                 gemu_use_tracing = true;
+                break;
+            case QEMU_OPTION_gemuhidehypervisor:
+                gemu_hide_hypervisor = true;
                 break;
             case QEMU_OPTION_win2k_hack:
                 win2k_install_hack = 1;

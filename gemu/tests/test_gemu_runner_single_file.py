@@ -52,6 +52,10 @@ class GemuInstanceMock:
         self.sent_to_gemu = []
         self.waited = None
 
+    @property
+    def monitor_socket_path(self):
+        return Path("/tmp/gemu_monitor_test.sock")
+
     @contextmanager
     def launch_gemu(self, params_string: str):
         try:
@@ -113,7 +117,7 @@ class TestGemuRunnerSingleFile:
 
         gemu_runner.run_sample()
 
-        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest -trackingmode {TRACKINGMODE} "
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor unix:/tmp/gemu_monitor_test.sock,server,nowait -addparameter IAmATest -trackingmode {TRACKINGMODE} "
                                                     f"-dotnet {DOTNET} -gemutracing -loadvm {SNAPSHOT} -symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
                                                     f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} "
                                                     f"{IMAGE_PATH}")
@@ -129,7 +133,7 @@ class TestGemuRunnerSingleFile:
         gemu_runner.decorate_run([])
         gemu_runner.run_sample()
 
-        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor unix:/tmp/gemu_monitor_test.sock,server,nowait -addparameter IAmATest "
                                                     f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} -loadvm {SNAPSHOT} "
                                                     f"-symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
                                                     f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE}"
@@ -222,7 +226,7 @@ class TestGemuRunnerSingleFile:
         gemu_runner.run_sample()
 
         assert "-codecarver" in mock_gemu_instance.params_string
-        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor stdio -addparameter IAmATest "
+        assert mock_gemu_instance.params_string == (f"-m {RAM_SIZE} -monitor unix:/tmp/gemu_monitor_test.sock,server,nowait -addparameter IAmATest "
                                                     f"-trackingmode {TRACKINGMODE} -dotnet {DOTNET} -codecarver -loadvm {SNAPSHOT} "
                                                     f"-symbolmapping {SYMBOLMAPPING} -apidoc {APIDOC} "
                                                     f"-watchedprograms {SAMPLE_NAME} -syscalltable {SYSCALLTABLE} {IMAGE_PATH}")

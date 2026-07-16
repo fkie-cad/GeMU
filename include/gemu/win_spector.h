@@ -32,6 +32,85 @@ typedef struct _OBJECT_ATTRIBUTES {
   PVOID           SecurityQualityOfService;
 } OBJECT_ATTRIBUTES;
 
+// --- Registry value-query types (used by handle_NtQueryValueKey) ---
+
+typedef QWORD ULONG_64, PVOID_64;
+typedef DWORD ULONG_32;
+
+typedef enum _KEY_VALUE_INFORMATION_CLASS
+{
+    KeyValueBasicInformation,
+    KeyValueFullInformation,
+    KeyValuePartialInformation,
+    KeyValueFullInformationAlign64,
+    KeyValuePartialInformationAlign64,
+    KeyValueLayerInformation,
+    MaxKeyValueInfoClass
+} KEY_VALUE_INFORMATION_CLASS;
+
+typedef enum _KEY_VALUE_INFORMATION_KIND
+{
+    RegValueNone,
+    RegValueString,
+    RegValueExpandString,
+    RegValueBinary,
+    RegValueDword,
+    RegValueDwordBigEndian,
+    RegValueLink,
+    RegValueMultiString,
+    RegValueResourceList,
+    RegValueFullResourceDescriptor,
+    RegValueResourceRequirementsField,
+    RegValueQword,
+} KEY_VALUE_INFORMATION_KIND;
+
+#ifdef USE_KEY_VALUE_INFORMATION_CLASS_NAMES
+static const char* KEY_VALUE_INFORMATION_CLASS_NAMES[] = {
+    "KeyValueBasicInformation",
+    "KeyValueFullInformation",
+    "KeyValuePartialInformation",
+    "KeyValueFullInformationAlign64",
+    "KeyValuePartialInformationAlign64",
+    "KeyValueLayerInformation",
+    "MaxKeyValueInfoClass"
+};
+
+static const char* KEY_VALUE_INFORMATION_KIND_NAMES[] = {
+    "REG_VALUE_UNKNOWN",
+    "REG_VALUE_STRING",
+    "REG_VALUE_EXPANDSTRING",
+    "REG_VALUE_BINARY",
+    "REG_VALUE_DWORD",
+    "REG_VALUE_DWORD_BIG_ENDIAN",
+    "REG_VALUE_LINK",
+    "REG_VALUE_MULTISTRING",
+    "REG_VALUE_RESOURCE_LIST",
+    "REG_VALUE_FULL_RESOURCE_DESCRIPTOR",
+    "REG_VALUE_RESOURCE_REQUIREMENTS_FIELD",
+    "REG_VALUE_QWORD"
+};
+#endif
+
+typedef struct _KEY_VALUE_FULL_INFORMATION_32
+{
+    ULONG_32 TitleIndex;
+    ULONG_32 Type;
+    ULONG_32 DataOffset;
+    ULONG_32 DataLength;
+    ULONG_32 NameLength;
+    BYTE Data;
+} KEY_VALUE_FULL_INFORMATION_32, *PKEY_VALUE_FULL_INFORMATION_32;
+
+typedef struct _KEY_VALUE_PARTIAL_INFORMATION_32
+{
+    ULONG_32 TitleIndex;
+    ULONG_32 Type;
+    ULONG_32 DataLength;
+    BYTE Data;
+} KEY_VALUE_PARTIAL_INFORMATION_32, *PKEY_VALUE_PARTIAL_INFORMATION_32;
+
+// --- end registry value-query types ---
+
 typedef struct _PS_ATTRIBUTE
 {
     target_ulong Attribute;

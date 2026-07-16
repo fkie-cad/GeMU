@@ -12,9 +12,9 @@ class GemuRunner:
     def __init__(self, recording_time: int, trackingmode: str|None, dotnet: str|None, vm_config: VMConfig, recipe: Recipe,
                  gemu_instance: GemuInstance, codecarver: bool = False, tracing: bool = False):
         self.recipe = recipe
+        self.gemu_instance = gemu_instance
         self.gemu_cmd = self._get_gemu_params(dotnet, trackingmode, tracing, vm_config, codecarver)
         self.recording_time = recording_time
-        self.gemu_instance = gemu_instance
         self._decorators: list[RunDecorator] = []
 
     def decorate_run(self, decorators: list[RunDecorator]):
@@ -30,7 +30,7 @@ class GemuRunner:
 
         params = [
             "-m", vm_config.ram_size,
-            "-monitor stdio",
+            "-monitor", f"unix:{self.gemu_instance.monitor_socket_path},server,nowait",
             *vm_config.additional_parameters,
             *optional_parameters,
             "-loadvm", vm_config.snapshot,

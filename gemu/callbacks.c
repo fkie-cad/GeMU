@@ -63,6 +63,11 @@ bool convertToSharedWrittenBit(struct MappedMemoryNode* mmapNode, struct DoubleL
             found = true;
             if (!current->is_shared) {
                 current->is_shared = true;
+                current->shared_map_start = start;
+                current->shared_map_end = end;
+                current->shared_other_start = mmapNode->other_start;
+                current->shared_other_end = mmapNode->other_start + mmapNode->other_size;
+                current->shared_other_pid = mmapNode->other_ID;
                 if (other_writtenflag == NULL) {
                     bool* writtenflag = (bool*) malloc(sizeof(bool));
                     *writtenflag = current->written_to.local_written_to;
@@ -178,9 +183,64 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
         ))
             process->cache_section_written = NULL;
 
-        uint64_t length = section->end - section->start;
+        hwaddr dump_start = section->start;
+        hwaddr dump_end = section->end;
+
+        // For shared sections (injected via ZwMapViewOfSection), use the full mapped
+        // range instead of relying on page table walk results, which may miss
+        // demand-paged pages.
+        if (section->is_shared && section->shared_map_start != 0 &&
+            section->shared_map_end > section->shared_map_start) {
+            printf("dump expansion: section=[0x%lx-0x%lx] shared_map=[0x%lx-0x%lx]\n",
+                   section->start, section->end, section->shared_map_start, section->shared_map_end);
+            if (section->shared_map_end > dump_end)
+                dump_end = section->shared_map_end;
+        }
+
+        uint64_t length = dump_end - dump_start;
+        printf("dumping: [0x%lx - 0x%lx] length=0x%lx is_shared=%d\n",
+               dump_start, dump_end, length, section->is_shared);
         uint8_t *buf = malloc(length + 1);
-        gemu_virtual_memory_read(cpu, section->start, buf, length);
+        gemu_virtual_memory_read(cpu, dump_start, buf, length);
+
+        // For shared sections, pages may not be present in the target process
+        // (demand-paged). Fill zero pages by reading from the source process.
+        if (section->is_shared && section->shared_other_pid != 0 &&
+            section->shared_other_start != 0) {
+            Gemu *gemu_inst = gemu_get_instance();
+            WinProcess *source_proc = get_WinProcess_for_pid(
+                gemu_inst->win_spec, section->shared_other_pid);
+            if (source_proc != NULL) {
+                target_ulong source_cr3 = source_proc->ASID;
+                hwaddr other_start = section->shared_other_start;
+                uint64_t other_length = section->shared_other_end - section->shared_other_start;
+
+                printf("shared dump: reading zero pages from source pid=%llu "
+                       "cr3=0x%lx other=[0x%lx-0x%lx]\n",
+                       section->shared_other_pid, source_cr3,
+                       other_start, other_start + other_length);
+
+                for (uint64_t offset = 0; offset < length; offset += TARGET_PAGE_SIZE) {
+                    uint64_t remaining = length - offset;
+                    uint64_t chunk = remaining < TARGET_PAGE_SIZE ? remaining : TARGET_PAGE_SIZE;
+
+                    bool is_zero = true;
+                    for (uint64_t i = 0; i < chunk; i++) {
+                        if (buf[offset + i] != 0) {
+                            is_zero = false;
+                            break;
+                        }
+                    }
+
+                    if (is_zero && offset < other_length) {
+                        gemu_virtual_memory_read_in_asid(cpu, source_cr3,
+                                                         other_start + offset,
+                                                         buf + offset, chunk);
+                    }
+                }
+            }
+        }
+
         extracted_data_size += length;
         char filename[261];
         struct timespec now;
@@ -188,13 +248,13 @@ void check_for_unpacking(CPUState *cpu, TranslationBlock *tb, WinProcess *proces
         wi_extract_module_list(cpu, process);
         ModuleNode* module = is_within_range(process->current_modules, temp_section->start, temp_section->end);
         if (module != NULL) {
-            snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_%s_%lu_dump_nr_%d", process->ID, section->start, module->file,
+            snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_%s_%lu_dump_nr_%d", process->ID, dump_start, module->file,
                     (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
         }
         else{
-            snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_mw_%lu_dump_nr_%d", process->ID, section->start, (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
+            snprintf(filename, sizeof(filename), "dumps/%llu_0x%lx_mw_%lu_dump_nr_%d", process->ID, dump_start, (now.tv_sec - start_time->tv_sec) * 1000 + (now.tv_nsec - start_time->tv_nsec) / 1000000, counter);
         }
-        unsetWrittenFlagForRange(section->start, section->end, process->new_sections);
+        unsetWrittenFlagForRange(dump_start, dump_end, process->new_sections);
         counter += 1;
         gemu_dump_buffer_to_file(buf, length, filename);
         free(buf);
@@ -334,6 +394,9 @@ void gemu_cb_sysret(CPUX86State *cpu)
     get_current_pid_and_tid(cpu_state, &pid, &tid, process);
     WinThread* current_thread = wi_current_thread(process, tid);
 
+    if (gemu_use_tracing) {
+        print_module_nodes(process->current_modules, process->ID);
+    }
     syscall_hook_t* return_hook = &current_thread->syscall_return_hook;
     if(return_hook->active == false){
         // sysret without hooked syscall

@@ -8,6 +8,10 @@ class YaraScanner(PostProcessor):
     def process(self, context: ProcessingContext) -> None:
         context.results["yara_matches"] = []
 
+        if context.yara_rules_path is None:
+            print("YARA scan skipped: no YARA rules provided")
+            return
+
         rules = self._load_rules(context.yara_rules_path)
 
         if context.analysis_folder.dumps_zip.exists():

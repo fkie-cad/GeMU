@@ -183,41 +183,81 @@ int gemu_virtual_memory_rw(CPUState *env, target_ulong addr,
     return 0;
 }
 
-void replaceSubstring(char *str, const char *oldSubstr, const char *newSubstr) {
-    char buffer[1024];  // Temporary buffer to store the result
-    char *pos;
-    int oldLen = strlen(oldSubstr);
-
-    buffer[0] = '\0';  // Initialize buffer to an empty string
-    char *start = str; // Keep track of the original starting point
-
-    // Loop through the original string, replacing occurrences of oldSubstr
-    while ((pos = strstr(str, oldSubstr)) != NULL) {
-        // Copy part of the string before the old substring into buffer
-        strncat(buffer, str, pos - str);  // Copy characters before oldSubstr
-
-        // Append the new substring to the buffer
-        strcat(buffer, newSubstr);
-
-        // Move str pointer forward past the old substring
-        str = pos + oldLen;
-    }
-
-    // Append the remaining part of the original string after the last occurrence
-    strcat(buffer, str);  // Copy the unprocessed part after the last match
-
-    // Copy the modified result back to the original string (starting point)
-    strcpy(start, buffer);
+// Reads from a different process's address space by temporarily swapping the
+// page-table base (cr[3]/ASID), then restoring it. Safe because the read path
+// does its own page walk from cr[3] rather than trusting the TLB. The swap is
+// restored unconditionally, so callers can't leak the borrowed address space.
+int gemu_virtual_memory_read_in_asid(CPUState *env, target_ulong asid,
+                                     target_ulong addr, uint8_t *buf, int len) {
+    target_ulong saved = env->env_ptr->cr[3];
+    env->env_ptr->cr[3] = asid;
+    int ret = gemu_virtual_memory_read(env, addr, buf, len);
+    env->env_ptr->cr[3] = saved;
+    return ret;
 }
 
+static const char *strings_to_replace[] = {
+    "qemu",
+    "vbox",
+    NULL,
+};
 
+
+// collision prevention: result != last result. earlier results may be repeated
+// result will have `len` characters -> requires buffer of size `len+1`
+static void random_alpha_string(char *out, size_t len) {
+    static const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static char last[64];
+    static size_t last_len = 0;
+
+    bool collision;
+    do {
+        for (size_t i = 0; i < len; i++) {
+            out[i] = charset[rand() % (sizeof(charset) - 1)];
+        }
+        out[len] = '\0';
+        collision = (len == last_len && memcmp(out, last, len + 1) == 0);
+    } while (collision);
+
+    memcpy(last, out, len + 1);
+    last_len = len;
+}
+
+void copy_wide_to_normal_string(unsigned char *dst, unsigned char *src, size_t dst_length) {
+    for (size_t i = 0; i < dst_length-1; i++) {
+        dst[i] = src[2*i];
+    }
+    dst[dst_length-1] = '\0';
+}
+
+// guest_va: address to overwrite string at
+// buf: contents of guest_address as ansi string
+// maxlen: in symbols not byte, including null terminator
+// is ansi -> only relevant for guest_va for writing back
 void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va, bool is_ansi){
-    int offset = 1;
-    if (is_ansi == false)
-        offset = 2;
+    int offset = is_ansi ? 1 : 2;
     unsigned i;
-    if (strstr(buf, "QEMU")) {
-        replaceSubstring(buf, "QEMU", "GeMU");
+    bool modified = false;
+
+    for (size_t s = 0; strings_to_replace[s] != NULL; s++) {
+        const char *target = strings_to_replace[s];
+        size_t target_len = strlen(target);
+        size_t len = strlen(buf);
+        char *pos = buf;
+        while (len >= target_len && pos <= buf + len - target_len) {
+            if (strncasecmp(pos, target, target_len) == 0) {
+                char replacement[target_len + 1];
+                random_alpha_string(replacement, target_len);
+                memcpy(pos, replacement, target_len);
+                modified = true;
+                pos += target_len;
+            } else {
+                pos++;
+            }
+        }
+    }
+
+    if (modified) {
         for (i = 0; i < maxlen; i++) {
             gemu_virtual_memory_write(cpu, guest_va + offset * i, (uint8_t *) &buf[i], 1);
             if (buf[i] == 0) {
@@ -225,18 +265,9 @@ void over_write_qemu_substring(CPUState *cpu, char *buf, size_t maxlen, target_u
             }
         }
     }
-    if (strstr(buf, "qemu")){
-        replaceSubstring(buf, "qemu", "gemu");
-        for (i = 0; i < maxlen; i++) {
-            gemu_virtual_memory_write(cpu, guest_va + offset *  i, (uint8_t *) &buf[i], 1);
-            if (buf[i] == 0) {
-                break;
-            }
-        }
-    }
-    return;
 }
 
+// maxlen: maximum size of corresponding ansi string buffer in bytes including terminator
 uint32_t guest_wstrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va) {
     buf[0] = 0;
     unsigned i;
@@ -247,10 +278,12 @@ uint32_t guest_wstrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong gu
         }
     }
     buf[maxlen - 1] = 0;
-    over_write_qemu_substring(cpu, buf, (i + 1) * 2, guest_va, false);
+    // i+1 <= maxlen
+    over_write_qemu_substring(cpu, buf, i + 1, guest_va, false);
     return i;
 }
 
+// maxlen: maximum size of buffer in bytes including terminator
 uint32_t guest_astrncpy(CPUState *cpu, char *buf, size_t maxlen, target_ulong guest_va) {
     buf[0] = 0;
     unsigned i;

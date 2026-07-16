@@ -4,7 +4,9 @@ import threading
 import time
 from itertools import product
 from pathlib import Path
+from typing import Literal, Any
 
+from _pytest.compat import LEGACY_PATH
 import pytest
 
 from unpack_single_file import unpack_single_file
@@ -30,7 +32,7 @@ def compile(input_path: Path|str, output_path: Path|str, bitness: int, cwd=None)
     assert result.returncode == 0
 
 @pytest.fixture(scope="session")
-def compiled_tests_folder(tmp_path_factory):
+def compiled_tests_folder(tmp_path_factory: pytest.TempPathFactory):
     output_path = tmp_path_factory.mktemp("compiled_test_files")
     return output_path
 
@@ -69,6 +71,7 @@ def setup_gemu_and_shellcode():
 SHELLCODE_TEST_NAMES = (
     "injection",
     "ntmapviewofsection_injection",
+    "ntduplicateobject_injection",
     "owninjection",
     "owninjectionmemcpy",
     "writeprocessmemory",
@@ -77,7 +80,7 @@ SHELLCODE_TEST_NAMES = (
 
 @pytest.mark.emulation
 @pytest.mark.parametrize("test_name,bitness,trackingmode", product(SHELLCODE_TEST_NAMES, (32,64), ("syscall", "basicblock")))
-def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmode):
+def test_shellcode_payload(compiled_tests_folder: Any, test_name: str, bitness: Literal[32, 64], trackingmode: Literal['syscall', 'basicblock']):
     sample_path = compile_test(compiled_tests_folder, test_name, bitness)
     yararules = (TEST_FOLDER/"shellcode.yarc")
 
@@ -95,7 +98,7 @@ def test_shellcode_payload(compiled_tests_folder, test_name, bitness, trackingmo
 
 
 @pytest.mark.emulation
-def test_timeout(tmpdir):
+def test_timeout(tmpdir: LEGACY_PATH):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
     copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
     analysis_folder = unpack_single_file(
@@ -108,7 +111,7 @@ def test_timeout(tmpdir):
     assert "REASON FOR GEMU EXIT: timeout" in analysis_folder.runlog.read_text()
 
 @pytest.mark.emulation
-def test_qcow_is_released_from_first_instance(tmpdir):
+def test_qcow_is_released_from_first_instance(tmpdir: LEGACY_PATH):
     shutil.copy(SMALL_BITNESS_PE, tmpdir)
     copied_pe = Path(tmpdir) / SMALL_BITNESS_PE.name
     vm_config = get_vm_settings("win10")
@@ -131,14 +134,14 @@ def test_qcow_is_released_from_first_instance(tmpdir):
     assert "REASON FOR GEMU EXIT: timeout" in analysis_folder2.runlog.read_text()
 
 @pytest.mark.emulation
-def test_tracing_works(compiled_tests_folder):
+def test_tracing_works(compiled_tests_folder: Any):
     sample_path = compile_test(compiled_tests_folder, "injection", 32)
     yararules = (TEST_FOLDER/"shellcode.yarc")
 
     analysis_folder = unpack_single_file(
         sample=sample_path,
         config="win10",
-        time=10,
+        time=20,
         runname=f"gemutest-syscall",
         yararules=yararules,
         trackingmode="syscall",

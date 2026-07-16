@@ -1,3 +1,5 @@
+import math
+import random
 import shutil
 import subprocess
 import threading
@@ -17,12 +19,18 @@ class RunDecorator:
         self.return_code: str = ""
 
     def _run(self):
-        while True:
+        try:
+            while True:
+                self._decorate()
+                time.sleep(self._sleep)
+                if self._stop_decorator:
+                    break
             self._decorate()
-            time.sleep(self._sleep)
-            if self._stop_decorator:
-                break
-        self._decorate()
+        except BrokenPipeError:
+            # QEMU monitor socket was closed underneath us during shutdown
+            # (kill() races with this thread). Stop decorating.
+            print(f"{type(self).__name__}: monitor socket closed during shutdown, stopping decorator")
+            self._stop_decorator = True
 
     def stop(self):
         self._stop_decorator = True
@@ -56,7 +64,10 @@ class YaraEarlyExiter(RunDecorator):
                 continue
             print(f"checking file {dump}")
             try:
-                subprocess.check_output(f"sync '{str(dump)}'", shell=True)
+                try:
+                    subprocess.check_output(f"sync '{str(dump)}'", shell=True)
+                except subprocess.CalledProcessError:
+                    continue
                 matches = self.rules.match(str(dump))
                 self.checked_files.add(dump)
                 if matches:
@@ -120,3 +131,60 @@ class WrittenFileMerger(RunDecorator):
                         continue
                     with open(dump_path, "rb") as file_in:
                         shutil.copyfileobj(file_in, file_out)
+
+
+class MouseMover(RunDecorator):
+    """Moves mouse in a figure-eight and opens Task Manager after a delay.
+
+    Anti-evasion technique: malware often checks for human-like activity.
+    """
+
+    def __init__(self, sleep: float, gemu_instance: GemuInstance, taskmgr_delay: float = 10.0):
+        super().__init__(sleep, gemu_instance)
+        self._loop_progress = 0.0  # in whole figure-eight loops
+        self._current_x = 0 # relative to start position
+        self._current_y = 0
+        self._randomize_loop() # select initial loop parameters from same distribution
+        self._taskmgr_delay = taskmgr_delay
+        self._taskmgr_sent = False
+        self._taskmgr_start = None
+
+    def _randomize_loop(self):
+        """Pick new random parameters for the next figure-eight loop."""
+        self._amplitude_x = random.uniform(150, 250)
+        self._amplitude_y = random.uniform(100, 200)
+        self._loop_speed = random.uniform(0.08, 0.12) / (2 * math.pi)  # loops per tick
+
+    def _decorate(self):
+        if self._gemu_instance._monitor_sock is None:
+            return
+        self._move_mouse()
+        self._maybe_open_taskmgr()
+
+    def _move_mouse(self):
+        # Randomize shape each full loop (loop_progress crosses an integer)
+        old_loop = int(self._loop_progress)
+        self._loop_progress += self._loop_speed
+        if int(self._loop_progress) > old_loop:
+            self._randomize_loop()
+
+        # Figure-eight (lemniscate): x = Ax*sin(p), y = Ay*sin(p)*cos(p)
+        phase = 2 * math.pi * self._loop_progress
+        target_x = int(self._amplitude_x * math.sin(phase))
+        target_y = int(self._amplitude_y * math.sin(phase) * math.cos(phase))
+        dx = target_x - self._current_x
+        dy = target_y - self._current_y
+        self._current_x = target_x
+        self._current_y = target_y
+
+        if (dx, dy) != (0, 0):
+            self._gemu_instance.write_to_qemu_console(f"mouse_move {dx} {dy}\n".encode())
+
+    def _maybe_open_taskmgr(self):
+        if self._taskmgr_sent:
+            return
+        if self._taskmgr_start is None:
+            self._taskmgr_start = time.monotonic()
+        if time.monotonic() - self._taskmgr_start >= self._taskmgr_delay:
+            self._gemu_instance.write_to_qemu_console(b"sendkey ctrl-shift-esc\n")
+            self._taskmgr_sent = True

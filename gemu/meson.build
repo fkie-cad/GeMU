@@ -14,7 +14,9 @@ gemu_ss.add(files(
   './apidoc.c',
   './win_spector.c',
   './xxhash64.c',
-  './dotnet_spector.c'
+  './dotnet_spector.c',
+  './base64.c',
+  './cpuid_filter.c'
   ))
 
 specific_ss.add_all(when: 'CONFIG_TCG', if_true: gemu_ss)
